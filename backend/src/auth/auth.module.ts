@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { REFRESH_TOKEN_REPOSITORY } from './constants/auth.constants';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { MongoRefreshTokenRepository } from './repositories/mongo-refresh-token.repository';
 import {
   RefreshToken,
@@ -35,11 +36,13 @@ import { GoogleAuthService } from './services/google-auth.service';
     AuthService,
     GoogleAuthService,
     JwtAuthGuard,
+    RolesGuard,
     {
       provide: REFRESH_TOKEN_REPOSITORY,
       useClass: MongoRefreshTokenRepository,
     },
   ],
-  exports: [AuthService, JwtAuthGuard, JwtModule, GoogleAuthService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule, GoogleAuthService],
 })
+
 export class AuthModule {}
