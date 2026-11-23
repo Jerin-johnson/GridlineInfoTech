@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { BrandsService } from '../../brands/brands.service';
 import { CategoriesService } from '../../categories/categories.service';
+import { CloudinaryService } from '../../uploads/services/cloudinary.service';
 import { PRODUCT_REPOSITORY } from '../constants/product.constants';
 import { ProductsService } from '../products.service';
 
@@ -26,6 +27,10 @@ describe('ProductsService', () => {
   };
   let mockBrandsService: {
     findById: jest.Mock;
+  };
+  let mockCloudinaryService: {
+    uploadImage: jest.Mock;
+    deleteImage: jest.Mock;
   };
 
   const validProductId = new Types.ObjectId().toString();
@@ -50,6 +55,11 @@ describe('ProductsService', () => {
       findById: jest.fn(),
     };
 
+    mockCloudinaryService = {
+      uploadImage: jest.fn(),
+      deleteImage: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductsService,
@@ -64,6 +74,10 @@ describe('ProductsService', () => {
         {
           provide: BrandsService,
           useValue: mockBrandsService,
+        },
+        {
+          provide: CloudinaryService,
+          useValue: mockCloudinaryService,
         },
       ],
     }).compile();
@@ -263,6 +277,90 @@ describe('ProductsService', () => {
 
       const result = await service.archive(validProductId);
       expect(result.status).toBe('archived');
+    });
+  });
+
+  describe('addImage & removeImage', () => {
+    it('should upload image to cloudinary and append to product images', async () => {
+      const mockProduct = {
+        _id: validProductId,
+        name: 'Wheel',
+        images: [],
+        toObject: () => ({ _id: validProductId, name: 'Wheel', images: [] }),
+      };
+      mockProductRepository.findById.mockResolvedValue(mockProduct);
+      mockCloudinaryService.uploadImage.mockResolvedValue({
+        url: 'https://cloudinary.com/img.jpg',
+        publicId: 'cld_1',
+      });
+      mockProductRepository.update.mockResolvedValue({
+        ...mockProduct,
+        images: [
+          {
+            url: 'https://cloudinary.com/img.jpg',
+            publicId: 'cld_1',
+            alt: 'Wheel',
+            isPrimary: true,
+            sortOrder: 0,
+          },
+        ],
+        toObject: () => ({
+          _id: validProductId,
+          images: [{ url: 'https://cloudinary.com/img.jpg' }],
+        }),
+      });
+
+      const fakeFile = {
+        buffer: Buffer.from('img'),
+        mimetype: 'image/png',
+      } as Express.Multer.File;
+
+      const result = await service.addImage(validProductId, fakeFile);
+      expect(mockCloudinaryService.uploadImage).toHaveBeenCalledWith(
+        fakeFile,
+        'gridline/products',
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('should remove image from product and destroy on cloudinary', async () => {
+      const mockProduct = {
+        _id: validProductId,
+        images: [
+          {
+            url: 'https://cloudinary.com/img.jpg',
+            publicId: 'cld_1',
+            isPrimary: true,
+            sortOrder: 0,
+          },
+        ],
+        toObject: () => ({
+          _id: validProductId,
+          images: [
+            {
+              url: 'https://cloudinary.com/img.jpg',
+              publicId: 'cld_1',
+              isPrimary: true,
+              sortOrder: 0,
+            },
+          ],
+        }),
+      };
+      mockProductRepository.findById.mockResolvedValue(mockProduct);
+      mockProductRepository.update.mockResolvedValue({
+        _id: validProductId,
+        images: [],
+        toObject: () => ({ _id: validProductId, images: [] }),
+      });
+
+      await service.removeImage(validProductId, 'cld_1');
+      expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith('cld_1');
+      expect(mockProductRepository.update).toHaveBeenCalledWith(
+        validProductId,
+        {
+          images: [],
+        },
+      );
     });
   });
 });

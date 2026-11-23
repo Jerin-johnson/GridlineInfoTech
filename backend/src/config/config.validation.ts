@@ -12,4 +12,7 @@ export const configValidationSchema = Joi.object({
   JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
   GOOGLE_CLIENT_ID: Joi.string().required(),
   COOKIE_SECRET: Joi.string().optional(),
+  CLOUDINARY_CLOUD_NAME: Joi.string().optional(),
+  CLOUDINARY_API_KEY: Joi.string().optional(),
+  CLOUDINARY_API_SECRET: Joi.string().optional(),
 });

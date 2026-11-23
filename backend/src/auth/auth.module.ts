@@ -42,7 +42,12 @@ import { GoogleAuthService } from './services/google-auth.service';
       useClass: MongoRefreshTokenRepository,
     },
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule, GoogleAuthService],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+    JwtModule,
+    GoogleAuthService,
+  ],
 })
-
 export class AuthModule {}

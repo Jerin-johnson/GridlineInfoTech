@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { BrandsService } from '../../brands/brands.service';
 import { CategoriesService } from '../../categories/categories.service';
+import { CloudinaryService } from '../../uploads/services/cloudinary.service';
 import { PRODUCT_REPOSITORY } from '../constants/product.constants';
 import { ProductsService } from '../products.service';
 
@@ -44,6 +45,10 @@ describe('ProductsService - Filtering and Pagination', () => {
         },
         {
           provide: BrandsService,
+          useValue: {},
+        },
+        {
+          provide: CloudinaryService,
           useValue: {},
         },
       ],

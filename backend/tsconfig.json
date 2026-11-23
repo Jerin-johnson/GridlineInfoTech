@@ -16,7 +16,8 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "types": ["node", "jest"],
+    "types": ["node", "jest", "multer"],
+
     "strictNullChecks": true,
     "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,

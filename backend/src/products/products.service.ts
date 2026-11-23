@@ -8,12 +8,17 @@ import {
 import { FilterQuery, Types } from 'mongoose';
 import { BrandsService } from '../brands/brands.service';
 import { CategoriesService } from '../categories/categories.service';
+import { CloudinaryService } from '../uploads/services/cloudinary.service';
 import { PRODUCT_REPOSITORY } from './constants/product.constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import type { IProductRepository } from './interfaces/product-repository.interface';
-import { Product, ProductDocument } from './schemas/product.schema';
+import {
+  Product,
+  ProductDocument,
+  ProductImage,
+} from './schemas/product.schema';
 
 export interface FormattedProduct extends Record<string, unknown> {
   availableStock: number;
@@ -26,6 +31,7 @@ export class ProductsService {
     private readonly productRepository: IProductRepository,
     private readonly categoriesService: CategoriesService,
     private readonly brandsService: BrandsService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async create(dto: CreateProductDto): Promise<FormattedProduct> {
@@ -210,6 +216,75 @@ export class ProductsService {
     const updated = await this.productRepository.update(id, updateData);
     if (!updated) {
       throw new NotFoundException(`Product with ID '${id}' not found`);
+    }
+
+    return this.formatProduct(updated);
+  }
+
+  async addImage(
+    productId: string,
+    file: Express.Multer.File,
+    alt?: string,
+    isPrimary?: boolean,
+  ): Promise<FormattedProduct> {
+    const product = await this.findById(productId);
+    const uploaded = await this.cloudinaryService.uploadImage(
+      file,
+      'gridline/products',
+    );
+
+    const existingImages = ((product.images as ProductImage[]) || []).slice();
+    const shouldBePrimary = isPrimary ?? existingImages.length === 0;
+
+    if (shouldBePrimary) {
+      existingImages.forEach((img) => {
+        img.isPrimary = false;
+      });
+    }
+
+    const newImage: ProductImage = {
+      url: uploaded.url,
+      publicId: uploaded.publicId,
+      alt: alt ?? (product.name as string),
+      isPrimary: shouldBePrimary,
+      sortOrder: existingImages.length,
+    };
+
+    existingImages.push(newImage);
+
+    const updated = await this.productRepository.update(productId, {
+      images: existingImages,
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Product with ID '${productId}' not found`);
+    }
+
+    return this.formatProduct(updated);
+  }
+
+  async removeImage(
+    productId: string,
+    publicId: string,
+  ): Promise<FormattedProduct> {
+    const product = await this.findById(productId);
+    const existingImages = ((product.images as ProductImage[]) || []).slice();
+
+    const filtered = existingImages.filter((img) => img.publicId !== publicId);
+    if (filtered.length === existingImages.length) {
+      throw new NotFoundException(
+        `Image with publicId '${publicId}' not found on product`,
+      );
+    }
+
+    await this.cloudinaryService.deleteImage(publicId);
+
+    const updated = await this.productRepository.update(productId, {
+      images: filtered,
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Product with ID '${productId}' not found`);
     }
 
     return this.formatProduct(updated);

@@ -12,6 +12,8 @@ describe('ProductsController', () => {
     findAll: jest.Mock;
     update: jest.Mock;
     archive: jest.Mock;
+    addImage: jest.Mock;
+    removeImage: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -22,6 +24,8 @@ describe('ProductsController', () => {
       findAll: jest.fn(),
       update: jest.fn(),
       archive: jest.fn(),
+      addImage: jest.fn(),
+      removeImage: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -108,5 +112,41 @@ describe('ProductsController', () => {
 
     const result = await controller.archive('p1');
     expect(result.data.status).toBe('archived');
+  });
+
+  it('should upload product image', async () => {
+    mockProductsService.addImage.mockResolvedValue({
+      _id: 'p1',
+      images: [{ url: 'https://img.url' }],
+    });
+
+    const fakeFile = {
+      buffer: Buffer.from('abc'),
+    } as Express.Multer.File;
+
+    const result = await controller.uploadImage(
+      'p1',
+      fakeFile,
+      'Alt tag',
+      true,
+    );
+    expect(mockProductsService.addImage).toHaveBeenCalledWith(
+      'p1',
+      fakeFile,
+      'Alt tag',
+      true,
+    );
+    expect(result.message).toBe('Product image uploaded successfully');
+  });
+
+  it('should remove product image', async () => {
+    mockProductsService.removeImage.mockResolvedValue({
+      _id: 'p1',
+      images: [],
+    });
+
+    const result = await controller.removeImage('p1', 'cld_1');
+    expect(mockProductsService.removeImage).toHaveBeenCalledWith('p1', 'cld_1');
+    expect(result.message).toBe('Product image removed successfully');
   });
 });

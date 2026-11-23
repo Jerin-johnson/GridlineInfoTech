@@ -9,8 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -62,6 +65,43 @@ export class ProductsController {
     const product = await this.productsService.create(dto);
     return {
       message: 'Product created successfully',
+      data: product,
+    };
+  }
+
+  @Post(':id/images')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @UseInterceptors(FileInterceptor('image'))
+  @HttpCode(HttpStatus.CREATED)
+  async uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('alt') alt?: string,
+    @Body('isPrimary') isPrimary?: boolean,
+  ) {
+    const product = await this.productsService.addImage(
+      id,
+      file,
+      alt,
+      isPrimary,
+    );
+    return {
+      message: 'Product image uploaded successfully',
+      data: product,
+    };
+  }
+
+  @Delete(':id/images')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async removeImage(
+    @Param('id') id: string,
+    @Body('publicId') publicId: string,
+  ) {
+    const product = await this.productsService.removeImage(id, publicId);
+    return {
+      message: 'Product image removed successfully',
       data: product,
     };
   }
