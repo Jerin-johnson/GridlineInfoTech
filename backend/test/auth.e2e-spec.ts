@@ -7,9 +7,9 @@ import { AppModule } from '../src/app.module';
 import {
   AUTH_COOKIE_NAMES,
   REFRESH_TOKEN_REPOSITORY,
-} from '../src/auth/constants/auth.constants';
-import { GoogleAuthService } from '../src/auth/services/google-auth.service';
-import { USER_REPOSITORY } from '../src/users/constants/user.constants';
+} from '../src/modules/auth/constants/auth.constants';
+import { GoogleAuthService } from '../src/modules/auth/services/google-auth.service';
+import { USER_REPOSITORY } from '../src/modules/users/constants/user.constants';
 
 describe('Auth API (e2e)', () => {
   let app: INestApplication;
