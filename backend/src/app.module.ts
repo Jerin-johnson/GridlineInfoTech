@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { BrandsModule } from './brands/brands.module';
 import { CategoriesModule } from './categories/categories.module';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
@@ -16,8 +17,10 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     CategoriesModule,
+    BrandsModule,
   ],
   controllers: [AppController],
+
 
   providers: [
     AppService,
