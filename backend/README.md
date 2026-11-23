@@ -23,9 +23,34 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Gridline Automotive E-Commerce API built with [NestJS](https://github.com/nestjs/nest), TypeScript, MongoDB, and Mongoose.
+
+## Architecture
+
+The backend follows a consistent feature-based modular architecture:
+
+```
+src/
+├── modules/
+│   ├── auth/          # Authentication & Role-Based Authorization
+│   ├── users/         # User persistence and accounts
+│   ├── products/      # Automotive product catalog & search/filter
+│   ├── categories/    # Product categories & hierarchies
+│   ├── brands/        # Manufacturer brands
+│   └── uploads/       # Cloudinary media storage
+├── common/            # Shared cross-cutting components & utilities
+├── config/            # Environment configuration & validation
+├── database/          # Database connection module
+├── app.controller.ts  # Health check root controller
+├── app.module.ts      # Root NestJS application module
+└── main.ts            # Application bootstrap & entry point
+```
+
+Request flow:
+`Controller → Service → Repository (Interface) → MongoDB`
 
 ## Project setup
+
 
 ```bash
 $ npm install
