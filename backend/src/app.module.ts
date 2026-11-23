@@ -8,6 +8,7 @@ import { BrandsModule } from './brands/brands.module';
 import { CategoriesModule } from './categories/categories.module';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -18,8 +19,10 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     CategoriesModule,
     BrandsModule,
+    ProductsModule,
   ],
   controllers: [AppController],
+
 
 
   providers: [
