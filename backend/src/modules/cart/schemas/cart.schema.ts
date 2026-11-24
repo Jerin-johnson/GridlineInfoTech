@@ -1,0 +1,34 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+
+export type CartDocument = HydratedDocument<Cart>;
+
+@Schema({ _id: false })
+export class CartItem {
+  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
+  product!: Types.ObjectId;
+
+  @Prop({ required: true, min: 1, default: 1 })
+  quantity!: number;
+}
+export const CartItemSchema = SchemaFactory.createForClass(CartItem);
+
+@Schema({ timestamps: true, collection: 'carts' })
+export class Cart {
+  @Prop({ type: Types.ObjectId, ref: 'User', unique: true, sparse: true })
+  user?: Types.ObjectId;
+
+  @Prop({ type: String, unique: true, sparse: true, trim: true })
+  sessionId?: string;
+
+  @Prop({ type: [CartItemSchema], default: [] })
+  items!: CartItem[];
+
+  @Prop({ type: Date })
+  expiresAt?: Date;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const CartSchema = SchemaFactory.createForClass(Cart);

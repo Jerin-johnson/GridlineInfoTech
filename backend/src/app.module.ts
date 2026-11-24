@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { BrandsModule } from './modules/brands/brands.module';
+import { CartModule } from './modules/cart/cart.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { UsersModule } from './modules/users/users.module';
@@ -20,6 +21,7 @@ import { UsersModule } from './modules/users/users.module';
     CategoriesModule,
     BrandsModule,
     ProductsModule,
+    CartModule,
   ],
   controllers: [AppController],
 
