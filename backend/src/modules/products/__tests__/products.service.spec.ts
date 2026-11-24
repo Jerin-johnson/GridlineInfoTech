@@ -2,6 +2,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -21,6 +22,7 @@ describe('ProductsService', () => {
     findBySku: jest.Mock;
     findAll: jest.Mock;
     update: jest.Mock;
+    findRelated: jest.Mock;
   };
   let mockCategoriesService: {
     findById: jest.Mock;
@@ -45,6 +47,7 @@ describe('ProductsService', () => {
       findBySku: jest.fn(),
       findAll: jest.fn(),
       update: jest.fn(),
+      findRelated: jest.fn(),
     };
 
     mockCategoriesService = {
@@ -360,6 +363,94 @@ describe('ProductsService', () => {
         {
           images: [],
         },
+      );
+    });
+  });
+
+  describe('getRelatedProducts', () => {
+    it('should return related products excluding current product', async () => {
+      const mockProduct = {
+        _id: validProductId,
+        category: new Types.ObjectId(validCategoryId),
+        brand: new Types.ObjectId(validBrandId),
+        status: 'published',
+      };
+      mockProductRepository.findById.mockResolvedValue(mockProduct);
+
+      const mockRelated = [
+        {
+          _id: new Types.ObjectId().toString(),
+          name: 'Related Product 1',
+          stock: 10,
+          reservedStock: 2,
+          toObject: () => ({
+            name: 'Related Product 1',
+            stock: 10,
+            reservedStock: 2,
+          }),
+        },
+      ];
+      mockProductRepository.findRelated.mockResolvedValue(mockRelated);
+
+      const result = await service.getRelatedProducts(validProductId, 4);
+      expect(result).toHaveLength(1);
+      expect(result[0].availableStock).toBe(8);
+      expect(mockProductRepository.findRelated).toHaveBeenCalledWith(
+        validProductId,
+        validCategoryId,
+        validBrandId,
+        4,
+      );
+    });
+
+    it('should throw NotFoundException if product is not found or archived', async () => {
+      mockProductRepository.findById.mockResolvedValue(null);
+      mockProductRepository.findBySlug.mockResolvedValue(null);
+
+      await expect(service.getRelatedProducts(validProductId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('findAll role-based status filtering', () => {
+    it('should throw ForbiddenException if non-admin attempts to query draft status', async () => {
+      await expect(service.findAll({ status: 'draft' }, false)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException if non-admin attempts to query archived status', async () => {
+      await expect(
+        service.findAll({ status: 'archived' }, false),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow admin to query draft status', async () => {
+      mockProductRepository.findAll.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
+
+      await service.findAll({ status: 'draft' }, true);
+      expect(mockProductRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'draft' }),
+        expect.any(Object),
+      );
+    });
+
+    it('should default non-admin query to published and out_of_stock products', async () => {
+      mockProductRepository.findAll.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
+
+      await service.findAll({}, false);
+      expect(mockProductRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: { $in: ['published', 'out_of_stock'] },
+        }),
+        expect.any(Object),
       );
     });
   });

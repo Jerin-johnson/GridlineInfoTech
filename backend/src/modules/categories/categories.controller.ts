@@ -11,9 +11,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtPayload } from '../auth/interfaces/auth.interfaces';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -27,9 +29,12 @@ export class CategoriesController {
   async findAll(
     @Query('status') status?: 'active' | 'inactive',
     @Query('parent') parent?: string,
+    @CurrentUser() user?: JwtPayload | null,
   ) {
+    const isAdmin = user?.role === 'admin';
+    const effectiveStatus = isAdmin && status ? status : 'active';
     const categories = await this.categoriesService.findAll({
-      status: status ?? 'active',
+      status: effectiveStatus,
       parent: parent === 'null' ? null : parent,
     });
     return {

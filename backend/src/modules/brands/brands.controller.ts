@@ -11,9 +11,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtPayload } from '../auth/interfaces/auth.interfaces';
 import { BrandsService } from './brands.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
@@ -24,9 +26,14 @@ export class BrandsController {
 
   @Public()
   @Get()
-  async findAll(@Query('status') status?: 'active' | 'inactive') {
+  async findAll(
+    @Query('status') status?: 'active' | 'inactive',
+    @CurrentUser() user?: JwtPayload | null,
+  ) {
+    const isAdmin = user?.role === 'admin';
+    const effectiveStatus = isAdmin && status ? status : 'active';
     const brands = await this.brandsService.findAll({
-      status: status ?? 'active',
+      status: effectiveStatus,
     });
     return {
       message: 'Brands retrieved successfully',
