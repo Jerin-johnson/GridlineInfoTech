@@ -4,6 +4,8 @@ import { BrandSchema } from '../../modules/brands/schemas/brand.schema';
 import { CategorySchema } from '../../modules/categories/schemas/category.schema';
 import { ProductSchema } from '../../modules/products/schemas/product.schema';
 import { UserSchema } from '../../modules/users/schemas/user.schema';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const MONGODB_URI =
   process.env.MONGODB_URI || 'mongodb://localhost:27017/gridline_ecommerce';
