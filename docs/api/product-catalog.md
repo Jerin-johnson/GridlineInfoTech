@@ -159,6 +159,7 @@ The Product Catalog API provides comprehensive catalog management and discovery 
   - `maxPrice`: Maximum price in cents
   - `inStockOnly`: `true` to filter items where `stock - reservedStock > 0`
   - `isFeatured`: `true` or `false`
+  - `status`: `'draft'` | `'published'` | `'out_of_stock'` | `'archived'` (Admin only. Public/Customer queries are restricted to published/out-of-stock items; non-admin querying `draft` or `archived` returns `403 Forbidden`)
   - `sortBy`: `'price'` | `'createdAt'` | `'name'` | `'stock'` (default: `'createdAt'`)
   - `sortOrder`: `'asc'` | `'desc'` (default: `'desc'`)
 - **Response `200 OK`:**
@@ -230,20 +231,26 @@ The Product Catalog API provides comprehensive catalog management and discovery 
 - **Route:** `GET /api/v1/products/slug/:slug`
 - **Auth:** Public
 
-### 5.3 Create Product
+### 5.3 Get Related Products
+- **Route:** `GET /api/v1/products/:id/related`
+- **Auth:** Public
+- **Query Parameters:** `limit` (default: `4`, max: `20`)
+- **Response `200 OK`:** Returns array of products in the same category or brand, excluding the current product, sorted by featured/newest.
+
+### 5.4 Create Product
 - **Route:** `POST /api/v1/products`
 - **Auth:** Admin
 - **Request Body:** `CreateProductDto` (validates active category and brand existence)
 
-### 5.4 Update Product
+### 5.5 Update Product
 - **Route:** `PATCH /api/v1/products/:id`
 - **Auth:** Admin
 
-### 5.5 Archive Product (Soft Deletion)
+### 5.6 Archive Product (Soft Deletion)
 - **Route:** `DELETE /api/v1/products/:id`
 - **Auth:** Admin
 
-### 5.6 Upload Product Image
+### 5.7 Upload Product Image
 - **Route:** `POST /api/v1/products/:id/images`
 - **Auth:** Admin
 - **Content-Type:** `multipart/form-data`
@@ -253,7 +260,7 @@ The Product Catalog API provides comprehensive catalog management and discovery 
   - `isPrimary`: Optional boolean
 - **Response `201 Created`:** Returns updated product document with image uploaded to Cloudinary.
 
-### 5.7 Remove Product Image
+### 5.8 Remove Product Image
 - **Route:** `DELETE /api/v1/products/:id/images`
 - **Auth:** Admin
 - **Request Body:**
@@ -276,3 +283,18 @@ CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 If Cloudinary credentials are omitted in development or unit tests, the server defaults to mock upload mode, returning valid asset metadata without throwing connection errors.
+
+---
+
+## 7. Database Seeding
+
+To seed realistic automotive categories, brands, products, and demo accounts:
+
+```bash
+npm run seed:catalog
+```
+
+### Seeded Credentials
+- **Admin:** `admin@gridline.com` / `Admin@123456`
+- **Customer:** `customer@gridline.com` / `Customer@123456`
+
