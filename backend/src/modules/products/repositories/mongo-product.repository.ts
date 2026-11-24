@@ -85,6 +85,28 @@ export class MongoProductRepository implements IProductRepository {
       .exec();
   }
 
+  async findRelated(
+    productId: string,
+    categoryId: string,
+    brandId: string,
+    limit = 4,
+  ): Promise<ProductDocument[]> {
+    return this.productModel
+      .find({
+        _id: { $ne: new Types.ObjectId(productId) },
+        status: { $in: ['published', 'out_of_stock'] },
+        $or: [
+          { category: new Types.ObjectId(categoryId) },
+          { brand: new Types.ObjectId(brandId) },
+        ],
+      })
+      .populate('category', 'name slug image status')
+      .populate('brand', 'name slug logo status')
+      .sort({ isFeatured: -1, createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
   async countByCategory(categoryId: string): Promise<number> {
     return this.productModel
       .countDocuments({

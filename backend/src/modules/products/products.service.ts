@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -133,6 +134,50 @@ export class ProductsService {
     }
 
     return this.formatProduct(product);
+  }
+
+  async getRelatedProducts(
+    idOrSlug: string,
+    limit = 4,
+  ): Promise<FormattedProduct[]> {
+    let product: ProductDocument | null = null;
+    if (Types.ObjectId.isValid(idOrSlug)) {
+      product = await this.productRepository.findById(idOrSlug);
+    }
+    if (!product) {
+      product = await this.productRepository.findBySlug(idOrSlug);
+    }
+    if (!product || product.status === 'archived') {
+      throw new NotFoundException(`Product '${idOrSlug}' not found`);
+    }
+
+    const categoryId = this.extractId(product.category);
+    const brandId = this.extractId(product.brand);
+
+    if (!categoryId || !brandId) {
+      return [];
+    }
+
+    const related = await this.productRepository.findRelated(
+      product._id.toString(),
+      categoryId,
+      brandId,
+      limit,
+    );
+
+    return related.map((item) => this.formatProduct(item));
+  }
+
+  private extractId(entity: unknown): string {
+    if (!entity) return '';
+    if (entity instanceof Types.ObjectId) return entity.toHexString();
+    if (typeof entity === 'string') return entity;
+    if (typeof entity === 'object' && entity !== null && '_id' in entity) {
+      const id = entity._id;
+      if (id instanceof Types.ObjectId) return id.toHexString();
+      if (typeof id === 'string') return id;
+    }
+    return '';
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<FormattedProduct> {
@@ -307,7 +352,10 @@ export class ProductsService {
     return this.formatProduct(updated);
   }
 
-  async findAll(query: ProductQueryDto): Promise<{
+  async findAll(
+    query: ProductQueryDto,
+    isAdmin = false,
+  ): Promise<{
     data: FormattedProduct[];
     meta: {
       page: number;
@@ -321,10 +369,25 @@ export class ProductsService {
 
     const filter: FilterQuery<ProductDocument> = {};
 
-    if (query.status) {
-      filter.status = query.status;
+    if (!isAdmin) {
+      if (query.status) {
+        if (query.status === 'draft' || query.status === 'archived') {
+          throw new ForbiddenException(
+            'Access denied: insufficient permissions to view non-published products',
+          );
+        }
+        filter.status = query.status;
+      } else {
+        filter.status = query.inStockOnly
+          ? 'published'
+          : { $in: ['published', 'out_of_stock'] };
+      }
     } else {
-      filter.status = 'published';
+      if (query.status) {
+        filter.status = query.status;
+      } else {
+        filter.status = { $ne: 'archived' };
+      }
     }
 
     if (query.search) {

@@ -29,11 +29,28 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
     if (isPublic) {
+      if (request) {
+        const token = this.extractToken(request);
+        if (token) {
+          try {
+            const payload = await this.jwtService.verifyAsync<JwtPayload>(
+              token,
+              {
+                secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+              },
+            );
+            request.user = payload;
+          } catch {
+            // Optional auth: silently proceed without user on public endpoints
+          }
+        }
+      }
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractToken(request);
 
     if (!token) {
@@ -55,13 +72,15 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractToken(request: Request): string | null {
+    if (!request) return null;
+
     // 1. Check HttpOnly cookie
     if (request.cookies?.[AUTH_COOKIE_NAMES.ACCESS_TOKEN]) {
       return request.cookies[AUTH_COOKIE_NAMES.ACCESS_TOKEN] as string;
     }
 
     // 2. Check Authorization Bearer header
-    const authHeader = request.headers.authorization;
+    const authHeader = request.headers?.authorization;
     if (authHeader) {
       const [type, token] = authHeader.split(' ');
       if (type === 'Bearer' && token) {

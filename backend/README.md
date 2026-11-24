@@ -69,6 +69,18 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Database Seeding
+
+Seed the database with realistic automotive categories, brands, products, specifications, fitment, and demo accounts:
+
+```bash
+$ npm run seed:catalog
+```
+
+### Seed Credentials
+- **Admin:** `admin@gridline.com` / `Admin@123456`
+- **Customer:** `customer@gridline.com` / `Customer@123456`
+
 ## Run tests
 
 ```bash

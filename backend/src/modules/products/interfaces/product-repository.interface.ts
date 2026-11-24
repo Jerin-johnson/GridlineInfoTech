@@ -21,6 +21,12 @@ export interface IProductRepository {
     },
   ): Promise<ProductQueryResult>;
   update(id: string, data: Partial<Product>): Promise<ProductDocument | null>;
+  findRelated(
+    productId: string,
+    categoryId: string,
+    brandId: string,
+    limit?: number,
+  ): Promise<ProductDocument[]>;
   countByCategory(categoryId: string): Promise<number>;
   countByBrand(brandId: string): Promise<number>;
 }

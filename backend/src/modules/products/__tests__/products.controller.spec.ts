@@ -14,6 +14,7 @@ describe('ProductsController', () => {
     archive: jest.Mock;
     addImage: jest.Mock;
     removeImage: jest.Mock;
+    getRelatedProducts: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -26,6 +27,7 @@ describe('ProductsController', () => {
       archive: jest.fn(),
       addImage: jest.fn(),
       removeImage: jest.fn(),
+      getRelatedProducts: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -55,6 +57,42 @@ describe('ProductsController', () => {
     expect(result.data).toHaveLength(1);
     expect(result.meta.total).toBe(1);
     expect(result.message).toBe('Products retrieved successfully');
+    expect(mockProductsService.findAll).toHaveBeenCalledWith(
+      { page: 1, limit: 12 },
+      false,
+    );
+  });
+
+  it('should pass isAdmin=true to service when user is admin', async () => {
+    mockProductsService.findAll.mockResolvedValue({
+      data: [{ name: 'Brake Pad', availableStock: 10 }],
+      meta: { page: 1, limit: 12, total: 1, totalPages: 1 },
+    });
+
+    const adminUser = {
+      sub: 'u1',
+      email: 'admin@gridline.com',
+      role: 'admin' as const,
+    };
+    await controller.findAll({ page: 1, limit: 12 }, adminUser);
+    expect(mockProductsService.findAll).toHaveBeenCalledWith(
+      { page: 1, limit: 12 },
+      true,
+    );
+  });
+
+  it('should return related products', async () => {
+    mockProductsService.getRelatedProducts.mockResolvedValue([
+      { _id: 'p2', name: 'Related Rotor', availableStock: 8 },
+    ]);
+
+    const result = await controller.getRelated('p1', 4);
+    expect(mockProductsService.getRelatedProducts).toHaveBeenCalledWith(
+      'p1',
+      4,
+    );
+    expect(result.data).toHaveLength(1);
+    expect(result.message).toBe('Related products retrieved successfully');
   });
 
   it('should create product', async () => {
