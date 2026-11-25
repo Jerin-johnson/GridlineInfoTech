@@ -266,9 +266,7 @@ export function CinematicFooter({
           className="footer-divider absolute top-0 inset-x-0 h-px bg-white/10 origin-left"
         />
 
-        <span>
-          © {new Date().getFullYear()} APEX ATELIER. All Rights Reserved.
-        </span>
+        <span>© 2026 APEX ATELIER. All Rights Reserved.</span>
 
         <div className="flex flex-wrap items-center justify-center gap-6">
           {categories.slice(0, 4).map((c) => (
