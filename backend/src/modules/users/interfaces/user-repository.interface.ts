@@ -7,4 +7,5 @@ export interface IUserRepository {
   create(data: Partial<User>): Promise<UserDocument>;
   updateLastLogin(id: string): Promise<void>;
   update(id: string, data: Partial<User>): Promise<UserDocument | null>;
+  save(user: UserDocument): Promise<UserDocument>;
 }
