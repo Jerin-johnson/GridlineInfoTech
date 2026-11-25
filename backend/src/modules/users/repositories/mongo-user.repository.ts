@@ -45,4 +45,8 @@ export class MongoUserRepository implements IUserRepository {
       .findByIdAndUpdate(id, { $set: data }, { new: true })
       .exec();
   }
+
+  async save(user: UserDocument): Promise<UserDocument> {
+    return user.save();
+  }
 }
