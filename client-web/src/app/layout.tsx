@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Bodoni_Moda, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SmoothScrollProvider } from "@/components/motion/SmoothScrollProvider";
 
-const cormorant = Cormorant_Garamond({
+const bodoni = Bodoni_Moda({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600"],
   variable: "--font-serif",
   display: "swap",
 });
 
-const inter = Inter({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
   variable: "--font-sans",
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${inter.variable} dark`}>
+    <html lang="en" className={`${bodoni.variable} ${jakarta.variable} dark`}>
       <body className="bg-[#080808] text-[#F5F5F3] font-sans antialiased selection:bg-[#C81E1E] selection:text-white overflow-x-hidden">
         <SmoothScrollProvider>{children}</SmoothScrollProvider>
       </body>

@@ -46,7 +46,7 @@ const FALLBACK_SEED_DATA: LandingPageData = {
       description:
         "Alcantara steering architectures, dry-carbon trim inlays, and billet shift paddles crafted for tactile driver connection.",
       image:
-        "https://images.unsplash.com/photo-1503736334956-4c8f8e929460?auto=format&fit=crop&w=1400&q=85",
+        "https://images.unsplash.com/photo-1611821064430-0d40291d0f0b?auto=format&fit=crop&w=1400&q=85",
       productCount: 14,
     },
     {
