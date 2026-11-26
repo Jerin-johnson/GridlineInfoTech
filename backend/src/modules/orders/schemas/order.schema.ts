@@ -134,6 +134,7 @@ export class Order {
   paymentMethod!: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: PAYMENT_STATUSES,
     default: 'pending',
@@ -141,6 +142,7 @@ export class Order {
   paymentStatus!: PaymentStatus;
 
   @Prop({
+    type: String,
     required: true,
     enum: FULFILMENT_STATUSES,
     default: 'placed',

@@ -342,6 +342,7 @@ export class OrdersService {
     const historyNote = reason
       ? `Order cancelled by customer: ${reason}`
       : 'Order cancelled by customer';
+    const shouldReleaseStock = existing.stockReserved;
 
     const cancelledOrder = await this.executeWithOptionalTransaction(
       async (session) => {
@@ -362,7 +363,7 @@ export class OrdersService {
           );
         }
 
-        if (existing.stockReserved) {
+        if (shouldReleaseStock) {
           for (const item of existing.items) {
             await this.productsService.releaseStock(
               item.product.toString(),
