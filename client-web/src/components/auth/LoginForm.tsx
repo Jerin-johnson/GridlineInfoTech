@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import {
   getCurrentUser,
   getSafeRedirectPath,
   loginUser,
 } from "@/lib/api/auth.api";
 import { ApiError } from "@/lib/api/client";
+import { gsap } from "@/lib/gsap";
+import { AuthField } from "./AuthField";
+import { AuthShell } from "./AuthShell";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,9 +25,11 @@ export function LoginForm() {
     ? `/register?redirect=${encodeURIComponent(redirectTarget)}`
     : "/register";
 
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
@@ -50,18 +55,41 @@ export function LoginForm() {
     };
   }, [router, redirectTarget]);
 
+  // Short horizontal shake on failed login (disabled under reduced motion)
+  const triggerErrorShake = () => {
+    if (
+      !formRef.current ||
+      (typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    ) {
+      return;
+    }
+
+    gsap.fromTo(
+      formRef.current,
+      { x: -7 },
+      {
+        x: 0,
+        duration: 0.42,
+        ease: "power3.out",
+        keyframes: [{ x: -7 }, { x: 7 }, { x: -4 }, { x: 4 }, { x: 0 }],
+        clearProps: "transform",
+      },
+    );
+  };
+
   const validate = (): boolean => {
     const errors: { email?: string; password?: string } = {};
     const trimmedEmail = email.trim();
 
     if (!trimmedEmail) {
-      errors.email = "Email address is required";
+      errors.email = "Enter your email address.";
     } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      errors.email = "Enter a valid email address";
+      errors.email = "Enter a valid email address (for example, alex@domain.com).";
     }
 
     if (!password) {
-      errors.password = "Password is required";
+      errors.password = "Enter your password.";
     }
 
     setFieldErrors(errors);
@@ -74,6 +102,7 @@ export function LoginForm() {
     setSuccessMessage(null);
 
     if (!validate()) {
+      triggerErrorShake();
       return;
     }
 
@@ -84,14 +113,19 @@ export function LoginForm() {
         password,
       });
 
-      setSuccessMessage(
-        `Welcome back, ${result.user.firstName}. Redirecting...`,
-      );
-      router.push(redirectTarget);
-      router.refresh();
+      setSuccessMessage(`Welcome back, ${result.user.firstName}.`);
+      setTimeout(() => {
+        router.push(redirectTarget);
+        router.refresh();
+      }, 420);
     } catch (err) {
+      triggerErrorShake();
       if (err instanceof ApiError) {
-        setServerError(err.message);
+        setServerError(
+          err.status === 401
+            ? "Email or password is incorrect. Check your credentials and try again."
+            : err.message,
+        );
       } else {
         setServerError("Unable to sign in right now. Please try again.");
       }
@@ -100,151 +134,127 @@ export function LoginForm() {
     }
   };
 
+  const isSuccess = Boolean(successMessage);
+
   return (
-    <div className="space-y-6">
-      {serverError && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 border border-[#C81E1E]/50 bg-[#C81E1E]/10 px-4 py-3 text-xs text-[#F5F5F3]"
-        >
-          <AlertCircle className="w-4 h-4 text-[#C81E1E] shrink-0 mt-0.5" />
-          <p className="leading-relaxed">{serverError}</p>
-        </div>
-      )}
-
-      {successMessage && (
-        <div
-          role="status"
-          className="flex items-start gap-3 border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-[#F5F5F3]"
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">{successMessage}</p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
-        <div>
-          <label
-            htmlFor="login-email"
-            className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
+    <AuthShell
+      headline="Welcome back"
+      supportingCopy="Track orders, manage fitments and check out faster."
+      posterImage="https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?auto=format&fit=crop&w=1600&q=85"
+      posterAlt="Performance coupe wheel and brake hardware in studio lighting"
+      isPasswordFocused={isPasswordFocused}
+      isSuccess={isSuccess}
+    >
+      <div className="space-y-6">
+        {serverError && (
+          <div
+            role="alert"
+            className="flex items-start gap-3 border border-[#D13423]/60 bg-[#D13423]/12 px-4 py-3.5 text-sm text-[#F3F4F6]"
           >
-            Email Address
-          </label>
-          <input
+            <AlertCircle className="w-4 h-4 text-[#D13423] shrink-0 mt-0.5" />
+            <p className="leading-relaxed">{serverError}</p>
+          </div>
+        )}
+
+        {successMessage && (
+          <div
+            role="status"
+            className="flex items-start gap-3 border border-emerald-500/40 bg-emerald-500/10 px-4 py-3.5 text-sm text-[#F3F4F6]"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">{successMessage}</p>
+          </div>
+        )}
+
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          noValidate
+          className="space-y-5"
+        >
+          <AuthField
             id="login-email"
             name="email"
+            label="Email address"
             type="email"
             autoComplete="email"
+            placeholder="alex@apexatelier.com"
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
+            onChange={(val) => {
+              setEmail(val);
               if (fieldErrors.email) {
                 setFieldErrors((prev) => ({ ...prev, email: undefined }));
               }
             }}
-            disabled={isSubmitting || Boolean(successMessage)}
-            aria-invalid={Boolean(fieldErrors.email)}
-            aria-describedby={
-              fieldErrors.email ? "login-email-error" : undefined
-            }
-            placeholder="alex@apexatelier.com"
-            className="w-full rounded-none bg-[#141417]/70 border border-white/15 px-4 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
+            error={fieldErrors.email}
+            disabled={isSubmitting || isSuccess}
           />
-          {fieldErrors.email && (
-            <p
-              id="login-email-error"
-              className="mt-1.5 text-xs text-[#C81E1E]"
-            >
-              {fieldErrors.email}
-            </p>
-          )}
-        </div>
 
-        <div>
-          <label
-            htmlFor="login-password"
-            className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-          >
-            Password
-          </label>
-          <div className="relative">
-            <input
-              id="login-password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldErrors.password) {
-                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                }
-              }}
-              disabled={isSubmitting || Boolean(successMessage)}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={
-                fieldErrors.password ? "login-password-error" : undefined
+          <AuthField
+            id="login-password"
+            name="password"
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(val) => {
+              setPassword(val);
+              if (fieldErrors.password) {
+                setFieldErrors((prev) => ({ ...prev, password: undefined }));
               }
-              placeholder="Enter your password"
-              className="w-full rounded-none bg-[#141417]/70 border border-white/15 pl-4 pr-11 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
-            />
+            }}
+            onFocusChange={setIsPasswordFocused}
+            error={fieldErrors.password}
+            disabled={isSubmitting || isSuccess}
+          />
+
+          <div className="auth-field-item pt-1">
             <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 px-3.5 flex items-center text-zinc-400 hover:text-[#F5F5F3] transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70"
+              type="submit"
+              disabled={isSubmitting || isSuccess}
+              className="group relative h-14 w-full overflow-hidden rounded-none bg-[#F3F4F6] text-[#0A0B0E] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.985] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-2"
             >
-              {showPassword ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
+              {/* Smooth fill sweep on hover */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 -translate-x-full bg-[#D13423] transition-transform duration-300 ease-out group-hover:translate-x-0"
+              />
+              <span className="relative z-10 flex items-center justify-center gap-2.5 transition-colors duration-300 group-hover:text-[#F3F4F6]">
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{isSubmitting ? "Signing in..." : "Sign in"}</span>
+              </span>
             </button>
           </div>
-          {fieldErrors.password && (
-            <p
-              id="login-password-error"
-              className="mt-1.5 text-xs text-[#C81E1E]"
-            >
-              {fieldErrors.password}
-            </p>
-          )}
+        </form>
+
+        <GoogleAuthButton
+          mode="login"
+          disabled={isSubmitting || isSuccess}
+          onSuccess={(user) => {
+            setServerError(null);
+            setSuccessMessage(`Welcome back, ${user.firstName}.`);
+            setTimeout(() => {
+              router.push(redirectTarget);
+              router.refresh();
+            }, 420);
+          }}
+          onError={(msg) => {
+            triggerErrorShake();
+            setServerError(msg);
+          }}
+        />
+
+        <div className="auth-field-item pt-5 border-t border-white/10 flex items-center justify-between text-sm text-[#C4C8D0]">
+          <span>New to Apex Atelier?</span>
+          <Link
+            href={registerHref}
+            className="font-medium text-[#F3F4F6] hover:text-[#D13423] transition-colors underline underline-offset-4 decoration-white/25 hover:decoration-[#D13423]"
+          >
+            Create account
+          </Link>
         </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting || Boolean(successMessage)}
-          className="w-full rounded-none bg-[#F5F5F3] text-[#080808] px-7 py-3.5 text-[11px] tracking-[0.22em] uppercase font-medium hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 cursor-pointer"
-        >
-          {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          <span>{isSubmitting ? "Authenticating..." : "Sign In"}</span>
-        </button>
-      </form>
-
-      <GoogleAuthButton
-        mode="login"
-        disabled={isSubmitting || Boolean(successMessage)}
-        onSuccess={(user) => {
-          setServerError(null);
-          setSuccessMessage(
-            `Welcome back, ${user.firstName}. Redirecting...`,
-          );
-          router.push(redirectTarget);
-          router.refresh();
-        }}
-        onError={(msg) => setServerError(msg)}
-      />
-
-      <div className="pt-5 border-t border-white/10 flex items-center justify-between text-xs text-zinc-400">
-        <span>New to APEX ATELIER?</span>
-        <Link
-          href={registerHref}
-          className="text-[11px] tracking-[0.2em] uppercase text-[#F5F5F3] hover:text-[#C81E1E] transition-colors"
-        >
-          Create Account
-        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }

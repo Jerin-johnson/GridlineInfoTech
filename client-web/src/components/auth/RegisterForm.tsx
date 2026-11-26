@@ -1,22 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Loader2,
-} from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Loader2 } from "lucide-react";
 import {
   getCurrentUser,
   getSafeRedirectPath,
   registerUser,
 } from "@/lib/api/auth.api";
 import { ApiError } from "@/lib/api/client";
+import { gsap } from "@/lib/gsap";
+import { AuthField } from "./AuthField";
+import { AuthShell } from "./AuthShell";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,13 +35,14 @@ export function RegisterForm() {
     ? `/login?redirect=${encodeURIComponent(redirectTarget)}`
     : "/login";
 
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -68,6 +65,28 @@ export function RegisterForm() {
     };
   }, [router, redirectTarget]);
 
+  const triggerErrorShake = () => {
+    if (
+      !formRef.current ||
+      (typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    ) {
+      return;
+    }
+
+    gsap.fromTo(
+      formRef.current,
+      { x: -7 },
+      {
+        x: 0,
+        duration: 0.42,
+        ease: "power3.out",
+        keyframes: [{ x: -7 }, { x: 7 }, { x: -4 }, { x: 4 }, { x: 0 }],
+        clearProps: "transform",
+      },
+    );
+  };
+
   const hasMinLength = password.length >= 8 && password.length <= 64;
   const hasCaseMix = /[A-Z]/.test(password) && /[a-z]/.test(password);
   const hasNumberOrSpecial = /(\d|\W)/.test(password);
@@ -78,37 +97,37 @@ export function RegisterForm() {
     const errors: RegisterFieldErrors = {};
 
     if (!firstName.trim()) {
-      errors.firstName = "First name is required";
+      errors.firstName = "Enter your first name.";
     } else if (firstName.trim().length > 50) {
-      errors.firstName = "First name cannot exceed 50 characters";
+      errors.firstName = "First name cannot exceed 50 characters.";
     }
 
     if (!lastName.trim()) {
-      errors.lastName = "Last name is required";
+      errors.lastName = "Enter your last name.";
     } else if (lastName.trim().length > 50) {
-      errors.lastName = "Last name cannot exceed 50 characters";
+      errors.lastName = "Last name cannot exceed 50 characters.";
     }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      errors.email = "Email address is required";
+      errors.email = "Enter your email address.";
     } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      errors.email = "Enter a valid email address";
+      errors.email = "Enter a valid email address (for example, alex@domain.com).";
     }
 
     if (!password) {
-      errors.password = "Password is required";
+      errors.password = "Create a password.";
     } else if (password.length < 8 || password.length > 64) {
-      errors.password = "Password must be between 8 and 64 characters";
+      errors.password = "Password must be between 8 and 64 characters.";
     } else if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
       errors.password =
-        "Must include uppercase, lowercase, and a number or special character";
+        "Include uppercase, lowercase, and at least one number or symbol.";
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = "Please confirm your password";
+      errors.confirmPassword = "Confirm your password.";
     } else if (password !== confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
+      errors.confirmPassword = "Passwords do not match.";
     }
 
     setFieldErrors(errors);
@@ -121,6 +140,7 @@ export function RegisterForm() {
     setSuccessMessage(null);
 
     if (!validate()) {
+      triggerErrorShake();
       return;
     }
 
@@ -133,12 +153,13 @@ export function RegisterForm() {
         password,
       });
 
-      setSuccessMessage(
-        `Account created for ${result.user.firstName}. Redirecting...`,
-      );
-      router.push(redirectTarget);
-      router.refresh();
+      setSuccessMessage(`Account created for ${result.user.firstName}.`);
+      setTimeout(() => {
+        router.push(redirectTarget);
+        router.refresh();
+      }, 420);
     } catch (err) {
+      triggerErrorShake();
       if (err instanceof ApiError) {
         setServerError(err.message);
       } else {
@@ -149,290 +170,223 @@ export function RegisterForm() {
     }
   };
 
+  const isSuccess = Boolean(successMessage);
+
   return (
-    <div className="space-y-6">
-      {serverError && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 border border-[#C81E1E]/50 bg-[#C81E1E]/10 px-4 py-3 text-xs text-[#F5F5F3]"
-        >
-          <AlertCircle className="w-4 h-4 text-[#C81E1E] shrink-0 mt-0.5" />
-          <p className="leading-relaxed">{serverError}</p>
-        </div>
-      )}
+    <AuthShell
+      headline="Create your account"
+      supportingCopy="Save delivery addresses, track orders and check out faster."
+      posterImage="https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=1600&q=85"
+      posterAlt="Forged automotive performance hardware in dark studio"
+      isPasswordFocused={isPasswordFocused}
+      isSuccess={isSuccess}
+    >
+      <div className="space-y-5">
+        {serverError && (
+          <div
+            role="alert"
+            className="flex items-start gap-3 border border-[#D13423]/60 bg-[#D13423]/12 px-4 py-3.5 text-sm text-[#F3F4F6]"
+          >
+            <AlertCircle className="w-4 h-4 text-[#D13423] shrink-0 mt-0.5" />
+            <p className="leading-relaxed">{serverError}</p>
+          </div>
+        )}
 
-      {successMessage && (
-        <div
-          role="status"
-          className="flex items-start gap-3 border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-xs text-[#F5F5F3]"
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">{successMessage}</p>
-        </div>
-      )}
+        {successMessage && (
+          <div
+            role="status"
+            className="flex items-start gap-3 border border-emerald-500/40 bg-emerald-500/10 px-4 py-3.5 text-sm text-[#F3F4F6]"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">{successMessage}</p>
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label
-              htmlFor="register-first-name"
-              className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-            >
-              First Name
-            </label>
-            <input
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          noValidate
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <AuthField
               id="register-first-name"
               name="firstName"
+              label="First name"
               type="text"
               autoComplete="given-name"
+              placeholder="Alex"
               value={firstName}
-              onChange={(e) => {
-                setFirstName(e.target.value);
+              onChange={(val) => {
+                setFirstName(val);
                 if (fieldErrors.firstName) {
                   setFieldErrors((prev) => ({ ...prev, firstName: undefined }));
                 }
               }}
-              disabled={isSubmitting || Boolean(successMessage)}
-              aria-invalid={Boolean(fieldErrors.firstName)}
-              placeholder="Alex"
-              className="w-full rounded-none bg-[#141417]/70 border border-white/15 px-4 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
+              error={fieldErrors.firstName}
+              disabled={isSubmitting || isSuccess}
             />
-            {fieldErrors.firstName && (
-              <p className="mt-1.5 text-xs text-[#C81E1E]">
-                {fieldErrors.firstName}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <label
-              htmlFor="register-last-name"
-              className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-            >
-              Last Name
-            </label>
-            <input
+            <AuthField
               id="register-last-name"
               name="lastName"
+              label="Last name"
               type="text"
               autoComplete="family-name"
+              placeholder="Vance"
               value={lastName}
-              onChange={(e) => {
-                setLastName(e.target.value);
+              onChange={(val) => {
+                setLastName(val);
                 if (fieldErrors.lastName) {
                   setFieldErrors((prev) => ({ ...prev, lastName: undefined }));
                 }
               }}
-              disabled={isSubmitting || Boolean(successMessage)}
-              aria-invalid={Boolean(fieldErrors.lastName)}
-              placeholder="Vance"
-              className="w-full rounded-none bg-[#141417]/70 border border-white/15 px-4 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
+              error={fieldErrors.lastName}
+              disabled={isSubmitting || isSuccess}
             />
-            {fieldErrors.lastName && (
-              <p className="mt-1.5 text-xs text-[#C81E1E]">
-                {fieldErrors.lastName}
-              </p>
-            )}
           </div>
-        </div>
 
-        <div>
-          <label
-            htmlFor="register-email"
-            className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-          >
-            Email Address
-          </label>
-          <input
+          <AuthField
             id="register-email"
             name="email"
+            label="Email address"
             type="email"
             autoComplete="email"
+            placeholder="alex@apexatelier.com"
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
+            onChange={(val) => {
+              setEmail(val);
               if (fieldErrors.email) {
                 setFieldErrors((prev) => ({ ...prev, email: undefined }));
               }
             }}
-            disabled={isSubmitting || Boolean(successMessage)}
-            aria-invalid={Boolean(fieldErrors.email)}
-            placeholder="alex@apexatelier.com"
-            className="w-full rounded-none bg-[#141417]/70 border border-white/15 px-4 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
+            error={fieldErrors.email}
+            disabled={isSubmitting || isSuccess}
           />
-          {fieldErrors.email && (
-            <p className="mt-1.5 text-xs text-[#C81E1E]">{fieldErrors.email}</p>
-          )}
-        </div>
 
-        <div>
-          <label
-            htmlFor="register-password"
-            className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-          >
-            Password
-          </label>
-          <div className="relative">
-            <input
-              id="register-password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldErrors.password) {
-                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                }
-              }}
-              disabled={isSubmitting || Boolean(successMessage)}
-              aria-invalid={Boolean(fieldErrors.password)}
-              placeholder="Minimum 8 characters"
-              className="w-full rounded-none bg-[#141417]/70 border border-white/15 pl-4 pr-11 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 px-3.5 flex items-center text-zinc-400 hover:text-[#F5F5F3] transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70"
-            >
-              {showPassword ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-          {fieldErrors.password && (
-            <p className="mt-1.5 text-xs text-[#C81E1E]">
-              {fieldErrors.password}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor="register-confirm-password"
-            className="block text-[10px] tracking-[0.22em] uppercase text-zinc-400 mb-2"
-          >
-            Confirm Password
-          </label>
-          <div className="relative">
-            <input
-              id="register-confirm-password"
-              name="confirmPassword"
-              type={showConfirmPassword ? "text" : "password"}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                if (fieldErrors.confirmPassword) {
-                  setFieldErrors((prev) => ({
-                    ...prev,
-                    confirmPassword: undefined,
-                  }));
-                }
-              }}
-              disabled={isSubmitting || Boolean(successMessage)}
-              aria-invalid={Boolean(fieldErrors.confirmPassword)}
-              placeholder="Re-enter your password"
-              className="w-full rounded-none bg-[#141417]/70 border border-white/15 pl-4 pr-11 py-3 text-sm text-[#F5F5F3] placeholder:text-zinc-600 focus:border-white/60 focus:outline-none transition-colors disabled:opacity-50"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={
-                showConfirmPassword
-                  ? "Hide confirm password"
-                  : "Show confirm password"
+          <AuthField
+            id="register-password"
+            name="password"
+            label="Password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Minimum 8 characters"
+            value={password}
+            onChange={(val) => {
+              setPassword(val);
+              if (fieldErrors.password) {
+                setFieldErrors((prev) => ({ ...prev, password: undefined }));
               }
-              aria-pressed={showConfirmPassword}
-              className="absolute inset-y-0 right-0 px-3.5 flex items-center text-zinc-400 hover:text-[#F5F5F3] transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70"
+            }}
+            onFocusChange={setIsPasswordFocused}
+            error={fieldErrors.password}
+            disabled={isSubmitting || isSuccess}
+          />
+
+          <AuthField
+            id="register-confirm-password"
+            name="confirmPassword"
+            label="Confirm password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            value={confirmPassword}
+            onChange={(val) => {
+              setConfirmPassword(val);
+              if (fieldErrors.confirmPassword) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: undefined,
+                }));
+              }
+            }}
+            onFocusChange={setIsPasswordFocused}
+            error={fieldErrors.confirmPassword}
+            disabled={isSubmitting || isSuccess}
+          />
+
+          <ul className="auth-field-item grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 text-xs text-[#9CA3AF]">
+            <li
+              className={`flex items-center gap-1.5 transition-colors ${
+                hasMinLength ? "text-emerald-400" : ""
+              }`}
             >
-              {showConfirmPassword ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              <span>8–64 characters</span>
+            </li>
+            <li
+              className={`flex items-center gap-1.5 transition-colors ${
+                hasCaseMix ? "text-emerald-400" : ""
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              <span>Upper &amp; lowercase</span>
+            </li>
+            <li
+              className={`flex items-center gap-1.5 transition-colors ${
+                hasNumberOrSpecial ? "text-emerald-400" : ""
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              <span>Number or symbol</span>
+            </li>
+            <li
+              className={`flex items-center gap-1.5 transition-colors ${
+                passwordsMatch ? "text-emerald-400" : ""
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              <span>Passwords match</span>
+            </li>
+          </ul>
+
+          <div className="auth-field-item pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting || isSuccess}
+              className="group relative h-14 w-full overflow-hidden rounded-none bg-[#F3F4F6] text-[#0A0B0E] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.985] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-2"
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 -translate-x-full bg-[#D13423] transition-transform duration-300 ease-out group-hover:translate-x-0"
+              />
+              <span className="relative z-10 flex items-center justify-center gap-2.5 transition-colors duration-300 group-hover:text-[#F3F4F6]">
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>
+                  {isSubmitting ? "Creating account..." : "Create account"}
+                </span>
+              </span>
             </button>
           </div>
-          {fieldErrors.confirmPassword && (
-            <p className="mt-1.5 text-xs text-[#C81E1E]">
-              {fieldErrors.confirmPassword}
-            </p>
-          )}
+        </form>
+
+        <GoogleAuthButton
+          mode="register"
+          disabled={isSubmitting || isSuccess}
+          onSuccess={(user) => {
+            setServerError(null);
+            setSuccessMessage(`Account ready, ${user.firstName}.`);
+            setTimeout(() => {
+              router.push(redirectTarget);
+              router.refresh();
+            }, 420);
+          }}
+          onError={(msg) => {
+            triggerErrorShake();
+            setServerError(msg);
+          }}
+        />
+
+        <div className="auth-field-item pt-5 border-t border-white/10 flex items-center justify-between text-sm text-[#C4C8D0]">
+          <span>Already have an account?</span>
+          <Link
+            href={loginHref}
+            className="font-medium text-[#F3F4F6] hover:text-[#D13423] transition-colors underline underline-offset-4 decoration-white/25 hover:decoration-[#D13423]"
+          >
+            Sign in
+          </Link>
         </div>
-
-        {/* Password Requirements Checklist */}
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 text-[11px] text-zinc-500">
-          <li
-            className={`flex items-center gap-1.5 transition-colors ${
-              hasMinLength ? "text-emerald-400" : ""
-            }`}
-          >
-            <Check className="w-3 h-3 shrink-0" />
-            <span>8–64 characters</span>
-          </li>
-          <li
-            className={`flex items-center gap-1.5 transition-colors ${
-              hasCaseMix ? "text-emerald-400" : ""
-            }`}
-          >
-            <Check className="w-3 h-3 shrink-0" />
-            <span>Upper &amp; lowercase</span>
-          </li>
-          <li
-            className={`flex items-center gap-1.5 transition-colors ${
-              hasNumberOrSpecial ? "text-emerald-400" : ""
-            }`}
-          >
-            <Check className="w-3 h-3 shrink-0" />
-            <span>Number or symbol</span>
-          </li>
-          <li
-            className={`flex items-center gap-1.5 transition-colors ${
-              passwordsMatch ? "text-emerald-400" : ""
-            }`}
-          >
-            <Check className="w-3 h-3 shrink-0" />
-            <span>Passwords match</span>
-          </li>
-        </ul>
-
-        <button
-          type="submit"
-          disabled={isSubmitting || Boolean(successMessage)}
-          className="w-full rounded-none bg-[#F5F5F3] text-[#080808] px-7 py-3.5 text-[11px] tracking-[0.22em] uppercase font-medium hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 cursor-pointer mt-2"
-        >
-          {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          <span>{isSubmitting ? "Creating Account..." : "Create Account"}</span>
-        </button>
-      </form>
-
-      <GoogleAuthButton
-        mode="register"
-        disabled={isSubmitting || Boolean(successMessage)}
-        onSuccess={(user) => {
-          setServerError(null);
-          setSuccessMessage(
-            `Account ready, ${user.firstName}. Redirecting...`,
-          );
-          router.push(redirectTarget);
-          router.refresh();
-        }}
-        onError={(msg) => setServerError(msg)}
-      />
-
-      <div className="pt-5 border-t border-white/10 flex items-center justify-between text-xs text-zinc-400">
-        <span>Already have an account?</span>
-        <Link
-          href={loginHref}
-          className="text-[11px] tracking-[0.2em] uppercase text-[#F5F5F3] hover:text-[#C81E1E] transition-colors"
-        >
-          Sign In
-        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }
