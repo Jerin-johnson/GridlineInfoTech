@@ -1,4 +1,4 @@
-import { FilterQuery } from 'mongoose';
+import { ClientSession, FilterQuery } from 'mongoose';
 import { Product, ProductDocument } from '../schemas/product.schema';
 
 export interface ProductQueryResult {
@@ -29,4 +29,14 @@ export interface IProductRepository {
   ): Promise<ProductDocument[]>;
   countByCategory(categoryId: string): Promise<number>;
   countByBrand(brandId: string): Promise<number>;
+  reserveStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean>;
+  releaseStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean>;
 }

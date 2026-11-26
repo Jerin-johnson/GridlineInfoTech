@@ -23,6 +23,8 @@ describe('ProductsService', () => {
     findAll: jest.Mock;
     update: jest.Mock;
     findRelated: jest.Mock;
+    reserveStock: jest.Mock;
+    releaseStock: jest.Mock;
   };
   let mockCategoriesService: {
     findById: jest.Mock;
@@ -48,6 +50,8 @@ describe('ProductsService', () => {
       findAll: jest.fn(),
       update: jest.fn(),
       findRelated: jest.fn(),
+      reserveStock: jest.fn(),
+      releaseStock: jest.fn(),
     };
 
     mockCategoriesService = {
@@ -451,6 +455,44 @@ describe('ProductsService', () => {
           status: { $in: ['published', 'out_of_stock'] },
         }),
         expect.any(Object),
+      );
+    });
+  });
+
+  describe('reserveStock and releaseStock', () => {
+    it('should reserve stock for valid productId and positive integer quantity', async () => {
+      mockProductRepository.reserveStock.mockResolvedValue(true);
+
+      const result = await service.reserveStock(validProductId, 2);
+      expect(result).toBe(true);
+      expect(mockProductRepository.reserveStock).toHaveBeenCalledWith(
+        validProductId,
+        2,
+        undefined,
+      );
+    });
+
+    it('should reject invalid productId in reserveStock', async () => {
+      await expect(service.reserveStock('invalid-id', 2)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should reject non-positive quantity in reserveStock', async () => {
+      await expect(service.reserveStock(validProductId, 0)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should release stock for valid productId and positive integer quantity', async () => {
+      mockProductRepository.releaseStock.mockResolvedValue(true);
+
+      const result = await service.releaseStock(validProductId, 2);
+      expect(result).toBe(true);
+      expect(mockProductRepository.releaseStock).toHaveBeenCalledWith(
+        validProductId,
+        2,
+        undefined,
       );
     });
   });
