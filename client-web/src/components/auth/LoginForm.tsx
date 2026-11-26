@@ -24,11 +24,9 @@ export function LoginForm() {
     ? `/register?redirect=${encodeURIComponent(redirectTarget)}`
     : "/register";
 
-  const { formScopeRef, shakeElement, fadeOutOnSuccess } =
-    useAuthFormAnimations();
-  const formRef = useRef<HTMLFormElement>(null);
-  const emailFieldRef = useRef<HTMLDivElement>(null);
-  const passwordFieldRef = useRef<HTMLDivElement>(null);
+  const { formScopeRef, fadeOutOnSuccess } = useAuthFormAnimations();
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,10 +70,11 @@ export function LoginForm() {
 
     setFieldErrors(errors);
 
+    // Calmly focus the first invalid field
     if (errors.email) {
-      shakeElement(emailFieldRef.current);
+      emailInputRef.current?.focus();
     } else if (errors.password) {
-      shakeElement(passwordFieldRef.current);
+      passwordInputRef.current?.focus();
     }
 
     return Object.keys(errors).length === 0;
@@ -97,15 +96,13 @@ export function LoginForm() {
       });
 
       setIsSuccess(true);
-      // ANIMATION 5b: Clean fade-out after button check morph
       setTimeout(() => {
         fadeOutOnSuccess(() => {
           router.push(redirectTarget);
           router.refresh();
         });
-      }, 320);
+      }, 280);
     } catch (err) {
-      shakeElement(formRef.current);
       if (err instanceof ApiError) {
         setServerError(
           err.status === 401
@@ -123,12 +120,10 @@ export function LoginForm() {
   return (
     <div ref={formScopeRef} className="space-y-6">
       <div className="space-y-2">
-        <div className="overflow-hidden">
-          <h1 className="auth-heading-line font-serif text-3xl sm:text-4xl font-normal leading-tight text-[#F2F1ED]">
-            Welcome back
-          </h1>
-        </div>
-        <p className="auth-stagger-item text-sm text-[#A0A4AE] leading-relaxed">
+        <h1 className="font-serif text-3xl sm:text-4xl font-light leading-tight text-[#F5F5F3]">
+          Welcome back
+        </h1>
+        <p className="text-sm text-zinc-400 leading-relaxed">
           Track orders, manage fitments and check out faster.
         </p>
       </div>
@@ -137,19 +132,14 @@ export function LoginForm() {
         <div
           role="alert"
           aria-live="polite"
-          className="flex items-start gap-2.5 rounded-[7px] border border-[#B83227]/45 bg-[#B83227]/10 px-4 py-3 text-sm text-[#F2F1ED]"
+          className="flex items-start gap-2.5 rounded-none border border-[#C81E1E]/50 bg-[#C81E1E]/10 px-4 py-3 text-sm text-[#F5F5F3]"
         >
-          <AlertCircle className="w-4 h-4 text-[#B83227] shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-[#C81E1E] shrink-0 mt-0.5" />
           <p className="leading-snug">{serverError}</p>
         </div>
       )}
 
-      <form
-        ref={formRef}
-        onSubmit={handleSubmit}
-        noValidate
-        className="space-y-4"
-      >
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <AuthField
           id="login-email"
           name="email"
@@ -158,7 +148,7 @@ export function LoginForm() {
           autoComplete="email"
           placeholder="you@example.com"
           value={email}
-          containerRef={emailFieldRef}
+          inputRef={emailInputRef}
           onChange={(val) => {
             setEmail(val);
             if (fieldErrors.email) {
@@ -177,7 +167,7 @@ export function LoginForm() {
           autoComplete="current-password"
           placeholder="Enter your password"
           value={password}
-          containerRef={passwordFieldRef}
+          inputRef={passwordInputRef}
           onChange={(val) => {
             setPassword(val);
             if (fieldErrors.password) {
@@ -188,21 +178,20 @@ export function LoginForm() {
           disabled={isSubmitting || isSuccess}
         />
 
-        {/* ANIMATION 5a: Primary button with hover fill sweep, 0.98 press, spinner -> check */}
-        <div className="auth-stagger-item pt-2">
+        <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting || isSuccess}
-            className="group relative h-[52px] w-full overflow-hidden rounded-[7px] bg-[#F2F1ED] text-[#0E0F12] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#B83227] focus-visible:outline-offset-2"
+            className="group relative h-[52px] w-full overflow-hidden rounded-none bg-[#F5F5F3] text-[#080808] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.985] disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#C81E1E] focus-visible:outline-offset-2"
           >
             <span
               aria-hidden="true"
-              className="absolute inset-0 -translate-x-full bg-[#B83227] transition-transform duration-300 ease-out group-hover:translate-x-0"
+              className="absolute inset-0 -translate-x-full bg-[#C81E1E] transition-transform duration-300 ease-out group-hover:translate-x-0"
             />
-            <span className="relative z-10 flex items-center justify-center gap-2 transition-colors duration-300 group-hover:text-[#F2F1ED]">
+            <span className="relative z-10 flex items-center justify-center gap-2 transition-colors duration-300 group-hover:text-white">
               {isSuccess ? (
                 <>
-                  <Check className="w-4 h-4 text-emerald-600 group-hover:text-[#F2F1ED] transition-transform duration-200 scale-110" />
+                  <Check className="w-4 h-4 text-emerald-600 group-hover:text-white" />
                   <span>Signed in</span>
                 </>
               ) : isSubmitting ? (
@@ -229,19 +218,16 @@ export function LoginForm() {
               router.push(redirectTarget);
               router.refresh();
             });
-          }, 320);
+          }, 280);
         }}
-        onError={(msg) => {
-          shakeElement(formRef.current);
-          setServerError(msg);
-        }}
+        onError={(msg) => setServerError(msg)}
       />
 
-      <div className="auth-stagger-item pt-4 border-t border-white/[0.08] flex items-center justify-between text-sm text-[#A0A4AE]">
+      <div className="pt-4 border-t border-white/10 flex items-center justify-between text-sm text-zinc-400">
         <span>New to Apex Atelier?</span>
         <Link
           href={registerHref}
-          className="font-medium text-[#F2F1ED] hover:text-[#B83227] transition-colors"
+          className="font-medium text-[#F5F5F3] hover:text-[#C81E1E] transition-colors"
         >
           Create account
         </Link>

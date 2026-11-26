@@ -245,7 +245,7 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
           <div className="flex items-center gap-4 sm:gap-5 md:gap-6">
             <Link
               href="/login"
-              className="hidden md:inline-flex py-1.5 text-[11px] tracking-[0.22em] uppercase text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+              className="hidden sm:inline-flex py-1.5 text-[11px] tracking-[0.22em] uppercase text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
             >
               Login
             </Link>

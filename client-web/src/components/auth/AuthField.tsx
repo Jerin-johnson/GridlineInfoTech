@@ -14,9 +14,10 @@ interface AuthFieldProps {
   placeholder?: string;
   value: string;
   onChange: (value: string) => void;
+  onFocus?: () => void;
   error?: string;
   disabled?: boolean;
-  containerRef?: React.RefObject<HTMLDivElement | null>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function AuthField({
@@ -28,9 +29,10 @@ export function AuthField({
   placeholder,
   value,
   onChange,
+  onFocus,
   error,
   disabled = false,
-  containerRef,
+  inputRef,
 }: AuthFieldProps) {
   const [showPassword, setShowPassword] = useState(false);
   const labelRef = useRef<HTMLLabelElement>(null);
@@ -43,14 +45,15 @@ export function AuthField({
       : "password"
     : type;
 
-  // ANIMATION 3: Input focus — label floats up, 1px accent line draws L->R, border brightens softly
+  // ANIMATION 4: Calm focus feedback — 1px crimson underline draws L->R + label brightens
   const animateFocus = (focused: boolean) => {
+    if (focused) onFocus?.();
     if (prefersReducedMotion()) return;
 
     if (underlineRef.current) {
       gsap.to(underlineRef.current, {
         scaleX: focused ? 1 : 0,
-        duration: 0.35,
+        duration: 0.3,
         ease: "power3.out",
         overwrite: "auto",
       });
@@ -58,9 +61,8 @@ export function AuthField({
 
     if (labelRef.current) {
       gsap.to(labelRef.current, {
-        y: focused ? -2 : 0,
-        color: focused ? "#F2F1ED" : "#A0A4AE",
-        duration: 0.25,
+        color: focused ? "#F5F5F3" : "#A1A1AA",
+        duration: 0.2,
         ease: "power3.out",
         overwrite: "auto",
       });
@@ -68,17 +70,18 @@ export function AuthField({
   };
 
   return (
-    <div ref={containerRef} className="auth-stagger-item">
+    <div>
       <label
         ref={labelRef}
         htmlFor={id}
-        className="block text-sm font-medium text-[#A0A4AE] mb-1.5"
+        className="block text-sm font-medium text-zinc-400 mb-1.5"
       >
         {label}
       </label>
 
-      <div className="relative overflow-hidden rounded-[7px]">
+      <div className="relative">
         <input
+          ref={inputRef}
           id={id}
           name={name}
           type={resolvedType}
@@ -91,20 +94,20 @@ export function AuthField({
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           placeholder={placeholder}
-          className={`h-[52px] w-full rounded-[7px] bg-[#1A1C22] border px-4 text-base text-[#F2F1ED] placeholder:text-[#5B606B] transition-colors duration-200 focus:outline-none focus:ring-2 disabled:opacity-50 ${
+          className={`h-[52px] w-full rounded-none bg-[#141417] border px-4 text-base text-[#F5F5F3] placeholder:text-zinc-600 transition-colors duration-200 focus:outline-none focus:ring-1 disabled:opacity-50 ${
             isPasswordField ? "pr-12" : ""
           } ${
             error
-              ? "border-[#B83227]/80 focus:border-[#B83227] focus:ring-[#B83227]/35"
-              : "border-white/[0.08] hover:border-white/[0.16] focus:border-[#B83227]/65 focus:ring-[#B83227]/30"
+              ? "border-[#C81E1E] focus:border-[#C81E1E] focus:ring-[#C81E1E]/60"
+              : "border-white/10 hover:border-white/20 focus:border-white/40 focus:ring-white/25"
           }`}
         />
 
-        {/* 1px accent underline drawing left-to-right on focus */}
+        {/* 1px crimson accent underline drawing left-to-right on focus */}
         <span
           ref={underlineRef}
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 left-0 right-0 h-[1.5px] origin-left scale-x-0 bg-[#B83227]"
+          className="pointer-events-none absolute bottom-0 left-0 right-0 h-[1.5px] origin-left scale-x-0 bg-[#C81E1E]"
         />
 
         {isPasswordField && (
@@ -113,7 +116,7 @@ export function AuthField({
             onClick={() => setShowPassword((prev) => !prev)}
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
-            className="absolute inset-y-0 right-0 px-3.5 flex items-center text-[#8B909C] hover:text-[#F2F1ED] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#B83227]"
+            className="absolute inset-y-0 right-0 px-3.5 flex items-center text-zinc-400 hover:text-[#F5F5F3] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#F5F5F3]"
           >
             {showPassword ? (
               <EyeOff className="w-4 h-4" />

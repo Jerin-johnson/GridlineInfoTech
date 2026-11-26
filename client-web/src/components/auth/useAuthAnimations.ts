@@ -9,77 +9,41 @@ export function prefersReducedMotion(): boolean {
 }
 
 /**
- * Shared GSAP choreography for the Auth Shell (left photo + Ken Burns + mouse parallax).
- * Runs once in the persistent (auth) layout so the photo stays in place during Sign in <-> Create account switches.
+ * Finite, one-shot entrance for the left vehicle image in (auth) layout.
+ * Zero infinite loops, zero pointermove listeners.
  */
 export function useAuthShellAnimations() {
   const shellRef = useRef<HTMLDivElement>(null);
-  const photoWrapRef = useRef<HTMLDivElement>(null);
-  const photoImgRef = useRef<HTMLDivElement>(null);
+  const photoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const shell = shellRef.current;
-    const photoWrap = photoWrapRef.current;
-    const photoImg = photoImgRef.current;
-    if (!shell || !photoWrap || !photoImg) return;
-
-    if (prefersReducedMotion()) {
-      return;
-    }
-
-    let xTo: gsap.QuickToFunc | null = null;
-    let yTo: gsap.QuickToFunc | null = null;
+    const photo = photoRef.current;
+    if (!shell || !photo || prefersReducedMotion()) return;
 
     const ctx = gsap.context(() => {
-      // ANIMATION 1a: Page load photo reveal via clip-path wipe
+      // ANIMATION 1: Finite one-shot photo reveal (transform + opacity only)
       gsap.fromTo(
-        photoWrap,
-        { clipPath: "inset(0 100% 0 0)" },
+        photo,
+        { opacity: 0, scale: 1.02 },
         {
-          clipPath: "inset(0 0% 0 0)",
-          duration: 0.75,
+          opacity: 1,
+          scale: 1,
+          duration: 0.65,
           ease: "power3.out",
-          clearProps: "clipPath",
+          clearProps: "transform,opacity",
         },
       );
-
-      // ANIMATION 2a: Slow Ken Burns (scale 1 -> 1.06 over ~20s, yoyo)
-      gsap.to(photoImg, {
-        scale: 1.06,
-        duration: 20,
-        ease: "sine.inOut",
-        repeat: -1,
-        yoyo: true,
-      });
-
-      // ANIMATION 2b: Damped mouse parallax (max 10px)
-      xTo = gsap.quickTo(photoImg, "x", { duration: 0.8, ease: "power3.out" });
-      yTo = gsap.quickTo(photoImg, "y", { duration: 0.8, ease: "power3.out" });
     }, shell);
 
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!xTo || !yTo) return;
-      const nx = (e.clientX / window.innerWidth - 0.5) * 2;
-      const ny = (e.clientY / window.innerHeight - 0.5) * 2;
-      xTo(Math.max(-10, Math.min(10, nx * 10)));
-      yTo(Math.max(-10, Math.min(10, ny * 10)));
-    };
-
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      ctx.revert();
-    };
+    return () => ctx.revert();
   }, []);
 
-  return { shellRef, photoWrapRef, photoImgRef };
+  return { shellRef, photoRef };
 }
 
 /**
- * Shared GSAP choreography for each Auth Form (Sign in / Create account).
- * Handles: masked heading reveal, 60ms field stagger, route switch crossfade+slide,
- * validation error shake, and success fade-out.
+ * Finite, non-blocking GSAP choreography for Sign In and Create Account forms.
  */
 export function useAuthFormAnimations() {
   const formScopeRef = useRef<HTMLDivElement>(null);
@@ -89,59 +53,24 @@ export function useAuthFormAnimations() {
     if (!scope || prefersReducedMotion()) return;
 
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-      // ANIMATION 6: Form panel crossfade with small horizontal slide on route switch
-      tl.fromTo(
+      // ANIMATION 2: Calm route-switch crossfade + subtle horizontal slide
+      gsap.fromTo(
         scope,
-        { opacity: 0, x: 14 },
-        { opacity: 1, x: 0, duration: 0.45, clearProps: "transform,opacity" },
-      )
-        // ANIMATION 1b: Heading lines slide up through a mask
-        .from(
-          ".auth-heading-line",
-          {
-            yPercent: 100,
-            opacity: 0,
-            duration: 0.6,
-            clearProps: "transform,opacity",
-          },
-          "-=0.35",
-        )
-        // ANIMATION 1c: Form fields fade up with 60ms stagger
-        .from(
-          ".auth-stagger-item",
-          {
-            y: 12,
-            opacity: 0,
-            duration: 0.45,
-            stagger: 0.06,
-            clearProps: "transform,opacity",
-          },
-          "-=0.4",
-        );
+        { opacity: 0, x: 10 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 0.35,
+          ease: "power3.out",
+          clearProps: "transform,opacity",
+        },
+      );
     }, scope);
 
     return () => ctx.revert();
   }, []);
 
-  // ANIMATION 7: Short horizontal shake on validation or auth error
-  const shakeElement = (element: HTMLElement | null) => {
-    if (!element || prefersReducedMotion()) return;
-    gsap.fromTo(
-      element,
-      { x: -6 },
-      {
-        x: 0,
-        duration: 0.4,
-        ease: "power3.out",
-        keyframes: [{ x: -6 }, { x: 6 }, { x: -4 }, { x: 4 }, { x: 0 }],
-        clearProps: "transform",
-      },
-    );
-  };
-
-  // ANIMATION 5b: Clean fade-out transition before navigating to the next page
+  // ANIMATION 3: Clean fade-out before navigating to the destination route
   const fadeOutOnSuccess = (onComplete: () => void) => {
     const scope = formScopeRef.current;
     if (!scope || prefersReducedMotion()) {
@@ -151,12 +80,12 @@ export function useAuthFormAnimations() {
 
     gsap.to(scope, {
       opacity: 0,
-      y: -6,
-      duration: 0.35,
+      y: -4,
+      duration: 0.25,
       ease: "power3.out",
       onComplete,
     });
   };
 
-  return { formScopeRef, shakeElement, fadeOutOnSuccess };
+  return { formScopeRef, fadeOutOnSuccess };
 }
