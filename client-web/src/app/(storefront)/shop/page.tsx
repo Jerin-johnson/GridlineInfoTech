@@ -163,7 +163,7 @@ export default function ShopPage({
 }) {
   return (
     <div className="min-h-screen bg-[#080808] text-[#F5F5F3]">
-      <Navbar />
+      <Navbar showNavigateDrawer={false} />
       <Suspense fallback={<CatalogueSkeleton />}>
         <ShopContent searchParamsPromise={searchParams} />
       </Suspense>

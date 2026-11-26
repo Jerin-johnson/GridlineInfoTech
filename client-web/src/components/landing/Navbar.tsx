@@ -85,9 +85,14 @@ const NAV_LINKS: NavItem[] = [
 interface NavbarProps {
   cartCount?: number;
   walletAddress?: string | null;
+  showNavigateDrawer?: boolean;
 }
 
-export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
+export function Navbar({
+  cartCount = 0,
+  walletAddress = null,
+  showNavigateDrawer = true,
+}: NavbarProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -403,42 +408,45 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
               )}
             </Link>
 
-            <button
-              type="button"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              aria-expanded={menuOpen}
-              aria-controls="fullscreen-nav-drawer"
-              aria-label={
-                menuOpen ? "Close navigation menu" : "Open navigation menu"
-              }
-              className="group flex items-center gap-3 py-2 text-[11px] tracking-[0.24em] uppercase text-zinc-200 hover:text-white transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
-            >
-              <span className="hidden sm:inline">
-                {menuOpen ? "Close" : "Navigate"}
-              </span>
-              {/* Morphing 2-Bar Architectural Icon */}
-              <span className="relative w-5 h-3 flex flex-col justify-between">
-                <span
-                  className={`block h-[1.5px] w-full bg-current origin-center transition-transform duration-300 ease-out ${
-                    menuOpen
-                      ? "translate-y-[5px] rotate-45"
-                      : "group-hover:w-3.5"
-                  }`}
-                />
-                <span
-                  className={`block h-[1.5px] w-full bg-current origin-center transition-transform duration-300 ease-out ${
-                    menuOpen ? "-translate-y-[5px] -rotate-45" : ""
-                  }`}
-                />
-              </span>
-            </button>
+            {showNavigateDrawer && (
+              <button
+                type="button"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                aria-expanded={menuOpen}
+                aria-controls="fullscreen-nav-drawer"
+                aria-label={
+                  menuOpen ? "Close navigation menu" : "Open navigation menu"
+                }
+                className="group flex items-center gap-3 py-2 text-[11px] tracking-[0.24em] uppercase text-zinc-200 hover:text-white transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+              >
+                <span className="hidden sm:inline">
+                  {menuOpen ? "Close" : "Navigate"}
+                </span>
+                {/* Morphing 2-Bar Architectural Icon */}
+                <span className="relative w-5 h-3 flex flex-col justify-between">
+                  <span
+                    className={`block h-[1.5px] w-full bg-current origin-center transition-transform duration-300 ease-out ${
+                      menuOpen
+                        ? "translate-y-[5px] rotate-45"
+                        : "group-hover:w-3.5"
+                    }`}
+                  />
+                  <span
+                    className={`block h-[1.5px] w-full bg-current origin-center transition-transform duration-300 ease-out ${
+                      menuOpen ? "-translate-y-[5px] -rotate-45" : ""
+                    }`}
+                  />
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Fullscreen GSAP Navigation Drawer */}
-      <div
-        id="fullscreen-nav-drawer"
+      {/* Fullscreen GSAP Navigation Drawer (Landing Page) */}
+      {showNavigateDrawer && (
+        <div
+          id="fullscreen-nav-drawer"
         ref={overlayRef}
         aria-hidden={!menuOpen}
         style={{ clipPath: "inset(0% 0% 100% 0%)" }}
@@ -570,7 +578,8 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
             </p>
           </div>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
