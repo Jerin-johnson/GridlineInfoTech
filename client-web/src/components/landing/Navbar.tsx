@@ -2,9 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ShoppingBag, Search, Wallet, ArrowUpRight, User } from "lucide-react";
+import {
+  ShoppingBag,
+  Search,
+  Wallet,
+  ArrowUpRight,
+  User,
+  ChevronDown,
+  LogOut,
+} from "lucide-react";
+import { getCurrentUser, logoutUser } from "@/lib/api/auth.api";
+import type { SafeUserProfile } from "@/types/auth.types";
 
 interface NavItem {
   label: string;
@@ -77,30 +88,85 @@ interface NavbarProps {
 }
 
 export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredIdx, setHoveredIdx] = useState(0);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<SafeUserProfile | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
 
-  // Scroll state & subtle crimson progress bar
+  // Header background transition on scroll (without progress bar)
   useEffect(() => {
     const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setIsScrolled(scrollY > 36);
-
-      const docHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-      setScrollProgress(docHeight > 0 ? Math.min(scrollY / docHeight, 1) : 0);
+      setIsScrolled(window.scrollY > 36);
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Verify backend session via HttpOnly cookie
+  useEffect(() => {
+    let active = true;
+    getCurrentUser()
+      .then((user) => {
+        if (active) setCurrentUser(user);
+      })
+      .catch(() => {
+        if (active) setCurrentUser(null);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Close account dropdown on outside click or Escape
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(e.target as Node)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAccountMenuOpen(false);
+    };
+    window.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [accountMenuOpen]);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await logoutUser();
+    } catch {
+      // Clear local state even if session already expired
+    } finally {
+      setCurrentUser(null);
+      setAccountMenuOpen(false);
+      setMenuOpen(false);
+      setIsSigningOut(false);
+      router.refresh();
+    }
+  };
 
   // Lock body scroll & handle Escape key when drawer is open
   useEffect(() => {
@@ -241,21 +307,88 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
             </span>
           </Link>
 
-          {/* Right: Guest Auth CTAs + Cart + Morphing Navigate Trigger */}
+          {/* Right: Account-Aware Auth Controls + Cart + Morphing Navigate Trigger */}
           <div className="flex items-center gap-4 sm:gap-5 md:gap-6">
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex py-1.5 text-[11px] tracking-[0.22em] uppercase text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
-            >
-              Login
-            </Link>
+            {authLoading ? (
+              <div
+                aria-hidden="true"
+                className="hidden sm:block h-7 w-[156px]"
+              />
+            ) : currentUser ? (
+              <div ref={accountMenuRef} className="relative hidden sm:block">
+                <button
+                  type="button"
+                  onClick={() => setAccountMenuOpen((prev) => !prev)}
+                  aria-expanded={accountMenuOpen}
+                  aria-haspopup="menu"
+                  className="inline-flex items-center gap-2 border border-white/15 bg-[#0D0D0F] px-3 py-1.5 text-[11px] tracking-[0.18em] uppercase text-[#F5F5F3] hover:border-white/40 transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+                >
+                  <User className="w-3.5 h-3.5 text-[#C81E1E]" />
+                  <span className="max-w-[96px] truncate">
+                    {currentUser.firstName}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 text-zinc-400 transition-transform duration-200 ${
+                      accountMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
 
-            <Link
-              href="/register"
-              className="hidden sm:inline-flex items-center border border-white/25 bg-[#F5F5F3]/5 px-3.5 py-1.5 text-[10px] tracking-[0.22em] uppercase text-[#F5F5F3] hover:bg-[#F5F5F3] hover:text-[#080808] hover:border-[#F5F5F3] transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
-            >
-              Create Account
-            </Link>
+                {accountMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-56 border border-white/15 bg-[#0D0D0F] shadow-none z-50"
+                  >
+                    <div className="px-4 py-3 border-b border-white/10">
+                      <p className="text-xs font-medium text-[#F5F5F3] truncate">
+                        {currentUser.firstName} {currentUser.lastName}
+                      </p>
+                      <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                        {currentUser.email}
+                      </p>
+                    </div>
+                    <div className="py-1">
+                      <Link
+                        href="/shop"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2.5 text-xs text-zinc-300 hover:bg-[#141417] hover:text-[#F5F5F3] transition-colors"
+                      >
+                        Browse Catalogue
+                      </Link>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={isSigningOut}
+                        onClick={handleSignOut}
+                        className="w-full text-left px-4 py-2.5 text-xs text-[#C81E1E] hover:bg-[#141417] transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>
+                          {isSigningOut ? "Signing out..." : "Sign Out"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden sm:inline-flex py-1.5 text-[11px] tracking-[0.22em] uppercase text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  href="/register"
+                  className="hidden sm:inline-flex items-center border border-white/25 bg-[#F5F5F3]/5 px-3.5 py-1.5 text-[10px] tracking-[0.22em] uppercase text-[#F5F5F3] hover:bg-[#F5F5F3] hover:text-[#080808] hover:border-[#F5F5F3] transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+                >
+                  Create Account
+                </Link>
+              </>
+            )}
 
             <Link
               href="/cart"
@@ -301,16 +434,6 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
             </button>
           </div>
         </div>
-
-        {/* Subtle Crimson Scroll Progress Hairline */}
-        {!menuOpen && (
-          <div className="absolute bottom-0 inset-x-0 h-[1px] bg-transparent pointer-events-none">
-            <div
-              className="h-full bg-[#C81E1E]/85 origin-left transition-transform duration-75"
-              style={{ transform: `scaleX(${scrollProgress})` }}
-            />
-          </div>
-        )}
       </header>
 
       {/* Fullscreen GSAP Navigation Drawer */}
@@ -405,30 +528,41 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
                 <span>{shortWallet ?? "Connect Wallet"}</span>
               </Link>
 
-              <Link
-                href="/account"
-                onClick={() => setMenuOpen(false)}
-                className="inline-flex items-center gap-2 border border-white/15 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-zinc-200 hover:border-white/50 hover:text-white transition-colors"
-              >
-                <User className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Account</span>
-              </Link>
+              {currentUser ? (
+                <>
+                  <span className="inline-flex items-center gap-2 border border-white/15 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-[#F5F5F3]">
+                    <User className="w-3.5 h-3.5 text-[#C81E1E]" />
+                    <span>{currentUser.firstName}</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isSigningOut}
+                    onClick={handleSignOut}
+                    className="inline-flex items-center gap-2 border border-[#C81E1E]/40 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-[#C81E1E] hover:bg-[#C81E1E] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>{isSigningOut ? "Signing out..." : "Sign Out"}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex items-center border border-white/15 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-zinc-200 hover:border-white/50 hover:text-white transition-colors"
+                  >
+                    Login
+                  </Link>
 
-              <Link
-                href="/login"
-                onClick={() => setMenuOpen(false)}
-                className="inline-flex items-center border border-white/15 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-zinc-200 hover:border-white/50 hover:text-white transition-colors"
-              >
-                Login
-              </Link>
-
-              <Link
-                href="/register"
-                onClick={() => setMenuOpen(false)}
-                className="inline-flex items-center border border-[#F5F5F3] bg-[#F5F5F3] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase font-medium text-[#080808] hover:bg-white transition-colors"
-              >
-                Create Account
-              </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex items-center border border-[#F5F5F3] bg-[#F5F5F3] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase font-medium text-[#080808] hover:bg-white transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </>
+              )}
             </div>
 
             <p className="text-[10px] tracking-[0.24em] uppercase text-zinc-500">
