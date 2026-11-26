@@ -26,12 +26,6 @@ export function CatalogueToolbar({
   const [searchDraft, setSearchDraft] = useState(searchQuery);
   const lastSubmittedRef = useRef(searchQuery);
 
-  // Sync draft when URL changes via Back/Forward or Reset All
-  useEffect(() => {
-    setSearchDraft(searchQuery);
-    lastSubmittedRef.current = searchQuery;
-  }, [searchQuery]);
-
   // Debounce search input (350ms)
   useEffect(() => {
     const trimmed = searchDraft.trim();

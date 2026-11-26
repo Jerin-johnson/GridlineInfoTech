@@ -152,6 +152,7 @@ export function CatalogueClient({
           <aside className="hidden lg:block lg:col-span-3 lg:border-r lg:border-white/10 lg:pr-8">
             <div className="sticky top-24">
               <FilterControls
+                key={`${filters.minPriceDollars}:${filters.maxPriceDollars}`}
                 brands={brands}
                 filters={filters}
                 activeFilterCount={activeFilterCount}
@@ -166,6 +167,7 @@ export function CatalogueClient({
           {/* Main Product Grid & Controls */}
           <div className="lg:col-span-9 flex flex-col">
             <CatalogueToolbar
+              key={searchQuery}
               searchQuery={searchQuery}
               sortOption={sortOption}
               activeFilterCount={activeFilterCount}
@@ -260,6 +262,7 @@ export function CatalogueClient({
 
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <FilterControls
+                key={`${filters.minPriceDollars}:${filters.maxPriceDollars}`}
                 brands={brands}
                 filters={filters}
                 activeFilterCount={activeFilterCount}
