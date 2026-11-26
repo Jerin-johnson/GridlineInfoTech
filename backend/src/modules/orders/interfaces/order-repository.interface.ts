@@ -40,4 +40,20 @@ export interface IOrderRepository {
     },
     session?: ClientSession,
   ): Promise<OrderDocument | null>;
+  updatePaymentStateAtomically(
+    orderId: string,
+    userId: string,
+    data: {
+      allowedCurrentPaymentStatuses: PaymentStatus[];
+      allowedCurrentFulfilmentStatuses: FulfilmentStatus[];
+      paymentStatus: PaymentStatus;
+      fulfilmentStatus?: FulfilmentStatus;
+      stockReserved?: boolean;
+      historyStatus: string;
+      historyNote: string;
+      actor?: string;
+      changedAt: Date;
+    },
+    session?: ClientSession,
+  ): Promise<OrderDocument | null>;
 }

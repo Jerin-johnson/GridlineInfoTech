@@ -21,6 +21,10 @@ import {
   ORDER_REPOSITORY,
   PAYMENT_WINDOW_MINUTES,
 } from './constants/order.constants';
+import type {
+  FulfilmentStatus,
+  PaymentStatus,
+} from './constants/order.constants';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { CheckoutDto } from './dto/checkout.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
@@ -381,6 +385,38 @@ export class OrdersService {
     );
 
     return this.formatOrder(cancelledOrder);
+  }
+
+  async updateOrderPaymentState(
+    orderId: string,
+    userId: string,
+    data: {
+      allowedCurrentPaymentStatuses: PaymentStatus[];
+      allowedCurrentFulfilmentStatuses: FulfilmentStatus[];
+      paymentStatus: PaymentStatus;
+      fulfilmentStatus?: FulfilmentStatus;
+      stockReserved?: boolean;
+      historyStatus: string;
+      historyNote: string;
+      actor?: string;
+    },
+    session?: ClientSession,
+  ): Promise<FormattedOrder | null> {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order or user ID format');
+    }
+
+    const updated = await this.orderRepository.updatePaymentStateAtomically(
+      orderId,
+      userId,
+      {
+        ...data,
+        changedAt: new Date(),
+      },
+      session,
+    );
+
+    return updated ? this.formatOrder(updated) : null;
   }
 
   private async executeWithOptionalTransaction<T>(

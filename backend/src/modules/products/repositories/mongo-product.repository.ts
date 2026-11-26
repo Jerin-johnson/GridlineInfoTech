@@ -159,4 +159,21 @@ export class MongoProductRepository implements IProductRepository {
     );
     return result.modifiedCount === 1;
   }
+
+  async confirmStockDeduction(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    const result = await this.productModel.updateOne(
+      {
+        _id: new Types.ObjectId(productId),
+        stock: { $gte: quantity },
+        reservedStock: { $gte: quantity },
+      },
+      { $inc: { stock: -quantity, reservedStock: -quantity } },
+      { session },
+    );
+    return result.modifiedCount === 1;
+  }
 }

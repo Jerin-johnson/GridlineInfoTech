@@ -480,6 +480,25 @@ export class ProductsService {
     return this.productRepository.releaseStock(productId, quantity, session);
   }
 
+  async confirmStockDeduction(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID format');
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+
+    return this.productRepository.confirmStockDeduction(
+      productId,
+      quantity,
+      session,
+    );
+  }
+
   private formatProduct(product: ProductDocument): FormattedProduct {
     const raw = product.toObject ? product.toObject() : product;
     const availableStock = Math.max(

@@ -39,4 +39,9 @@ export interface IProductRepository {
     quantity: number,
     session?: ClientSession,
   ): Promise<boolean>;
+  confirmStockDeduction(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean>;
 }
