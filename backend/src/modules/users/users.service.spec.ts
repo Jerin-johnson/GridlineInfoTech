@@ -224,7 +224,9 @@ describe('UsersService', () => {
   describe('getAddresses', () => {
     it('should return user addresses array', async () => {
       const mockUser = createMockUser({
-        addresses: [{ _id: new Types.ObjectId(), label: 'Home', isDefault: true }],
+        addresses: [
+          { _id: new Types.ObjectId(), label: 'Home', isDefault: true },
+        ],
       });
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
@@ -306,9 +308,13 @@ describe('UsersService', () => {
       const mockUser = createMockUser({ addresses: [address] });
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
-      const addresses = await service.updateAddress(validUserId, validAddressId, {
-        label: 'HQ Office',
-      });
+      const addresses = await service.updateAddress(
+        validUserId,
+        validAddressId,
+        {
+          label: 'HQ Office',
+        },
+      );
 
       expect(addresses[0].label).toBe('HQ Office');
       expect(mockUserRepository.save).toHaveBeenCalled();
@@ -328,9 +334,13 @@ describe('UsersService', () => {
       const mockUser = createMockUser({ addresses: [addr1, addr2] });
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
-      const addresses = await service.updateAddress(validUserId, validAddressId, {
-        isDefault: false,
-      });
+      const addresses = await service.updateAddress(
+        validUserId,
+        validAddressId,
+        {
+          isDefault: false,
+        },
+      );
 
       expect(addr1.isDefault).toBe(false);
       expect(addr2.isDefault).toBe(true);
@@ -383,7 +393,10 @@ describe('UsersService', () => {
       const mockUser = createMockUser({ addresses: [addr1] });
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
-      const addresses = await service.deleteAddress(validUserId, validAddressId);
+      const addresses = await service.deleteAddress(
+        validUserId,
+        validAddressId,
+      );
       expect(addresses).toHaveLength(0);
       expect(mockUserRepository.save).toHaveBeenCalled();
     });
@@ -402,7 +415,10 @@ describe('UsersService', () => {
       const mockUser = createMockUser({ addresses: [addr1, addr2] });
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
-      const addresses = await service.deleteAddress(validUserId, validAddressId);
+      const addresses = await service.deleteAddress(
+        validUserId,
+        validAddressId,
+      );
       expect(addresses).toHaveLength(1);
       expect(addresses[0]._id.toString()).toBe(validAddress2Id);
       expect(addresses[0].isDefault).toBe(true);

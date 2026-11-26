@@ -82,7 +82,9 @@ describe('UsersController', () => {
 
   describe('getAddresses', () => {
     it('should retrieve user saved addresses', async () => {
-      const mockAddresses = [{ _id: addressId, label: 'Home', isDefault: true }];
+      const mockAddresses = [
+        { _id: addressId, label: 'Home', isDefault: true },
+      ];
       mockUsersService.getAddresses.mockResolvedValue(mockAddresses);
 
       const result = await controller.getAddresses(userId);

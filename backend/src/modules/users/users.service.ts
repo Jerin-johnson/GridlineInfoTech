@@ -79,10 +79,7 @@ export class UsersService {
     return user.addresses || [];
   }
 
-  async addAddress(
-    userId: string,
-    dto: CreateAddressDto,
-  ): Promise<Address[]> {
+  async addAddress(userId: string, dto: CreateAddressDto): Promise<Address[]> {
     const user = await this.getUserOrThrow(userId);
 
     const isFirstAddress = !user.addresses || user.addresses.length === 0;
@@ -156,7 +153,8 @@ export class UsersService {
     if (dto.line2 !== undefined) address.line2 = dto.line2.trim();
     if (dto.city !== undefined) address.city = dto.city.trim();
     if (dto.state !== undefined) address.state = dto.state.trim();
-    if (dto.postalCode !== undefined) address.postalCode = dto.postalCode.trim();
+    if (dto.postalCode !== undefined)
+      address.postalCode = dto.postalCode.trim();
     if (dto.country !== undefined) address.country = dto.country.trim();
 
     user.markModified('addresses');
@@ -164,10 +162,7 @@ export class UsersService {
     return saved.addresses;
   }
 
-  async deleteAddress(
-    userId: string,
-    addressId: string,
-  ): Promise<Address[]> {
+  async deleteAddress(userId: string, addressId: string): Promise<Address[]> {
     if (!Types.ObjectId.isValid(addressId)) {
       throw new BadRequestException('Invalid address ID format');
     }
