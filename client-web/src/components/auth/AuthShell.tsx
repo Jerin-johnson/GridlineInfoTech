@@ -40,11 +40,27 @@ export function AuthShell({
         return;
       }
 
+      gsap.from(".auth-car-reveal", {
+        opacity: 0,
+        scale: 1.04,
+        duration: 0.9,
+        ease: "power3.out",
+        clearProps: "transform,opacity",
+      });
+
+      gsap.from(".auth-light-reveal", {
+        opacity: 0,
+        duration: 1.0,
+        delay: 0.1,
+        ease: "power2.out",
+        clearProps: "opacity",
+      });
+
       gsap.from(".auth-reveal", {
         opacity: 0,
-        y: 16,
-        duration: 0.65,
-        stagger: 0.08,
+        y: 14,
+        duration: 0.6,
+        stagger: 0.07,
         ease: "power3.out",
         clearProps: "transform,opacity",
       });
@@ -65,11 +81,31 @@ export function AuthShell({
             alt={editorialImageAlt}
             fill
             priority
+            quality={85}
             sizes="50vw"
-            className="object-cover object-center opacity-40 grayscale contrast-110"
+            className="auth-car-reveal object-cover object-center opacity-60 grayscale-[35%] contrast-115 brightness-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/65 to-[#080808]/85" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/60 via-transparent to-[#080808]/75" />
+          {/* Restrained overhead silver showroom key light */}
+          <div
+            aria-hidden="true"
+            className="auth-light-reveal absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 75% 52% at 50% 44%, rgba(245,245,243,0.16) 0%, rgba(245,245,243,0.05) 45%, transparent 75%)",
+            }}
+          />
+          {/* Subtle crimson floor/rim accent */}
+          <div
+            aria-hidden="true"
+            className="auth-light-reveal absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 60% 28% at 50% 78%, rgba(200,30,30,0.14) 0%, transparent 72%)",
+            }}
+          />
+          {/* Vignette framing preserving #080808 edges and crisp text contrast */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/35 to-[#080808]/80" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/55 via-transparent to-[#080808]/75" />
         </div>
 
         {/* Top Bar */}
