@@ -385,17 +385,17 @@ describe('OrdersService', () => {
     });
 
     it('should throw BadRequestException for invalid orderId', async () => {
-      await expect(
-        service.findUserOrderById(userId, 'bad-id'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.findUserOrderById(userId, 'bad-id')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw NotFoundException when order is missing or belongs to another user', async () => {
       mockOrderRepository.findByIdAndUser.mockResolvedValue(null);
 
-      await expect(
-        service.findUserOrderById(userId, orderId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findUserOrderById(userId, orderId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
