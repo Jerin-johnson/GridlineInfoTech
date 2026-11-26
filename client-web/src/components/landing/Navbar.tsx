@@ -241,8 +241,22 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
             </span>
           </Link>
 
-          {/* Right: Cart + Morphing Navigate Trigger */}
-          <div className="flex items-center gap-5 md:gap-7">
+          {/* Right: Guest Auth CTAs + Cart + Morphing Navigate Trigger */}
+          <div className="flex items-center gap-4 sm:gap-5 md:gap-6">
+            <Link
+              href="/login"
+              className="hidden sm:inline-flex py-1.5 text-[11px] tracking-[0.22em] uppercase text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+            >
+              Login
+            </Link>
+
+            <Link
+              href="/register"
+              className="hidden sm:inline-flex items-center border border-white/25 bg-[#F5F5F3]/5 px-3.5 py-1.5 text-[10px] tracking-[0.22em] uppercase text-[#F5F5F3] hover:bg-[#F5F5F3] hover:text-[#080808] hover:border-[#F5F5F3] transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
+            >
+              Create Account
+            </Link>
+
             <Link
               href="/cart"
               aria-label={`Shopping cart with ${cartCount} items`}
@@ -398,6 +412,22 @@ export function Navbar({ cartCount = 0, walletAddress = null }: NavbarProps) {
               >
                 <User className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Account</span>
+              </Link>
+
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center border border-white/15 bg-[#0D0D0F] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase text-zinc-200 hover:border-white/50 hover:text-white transition-colors"
+              >
+                Login
+              </Link>
+
+              <Link
+                href="/register"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center border border-[#F5F5F3] bg-[#F5F5F3] px-4 py-2.5 text-[10px] tracking-[0.2em] uppercase font-medium text-[#080808] hover:bg-white transition-colors"
+              >
+                Create Account
               </Link>
             </div>
 
