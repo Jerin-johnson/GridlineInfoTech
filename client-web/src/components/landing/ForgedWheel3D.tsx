@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
@@ -9,39 +16,90 @@ import {
   OrbitControls,
   PerformanceMonitor,
 } from "@react-three/drei";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { Minus, Plus, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 
 /* ------------------------------------------------------------------ */
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
-const FINISHES = [
-  { id: "bronze", label: "Satin Bronze", color: "#9b7a4c" },
-  { id: "gunmetal", label: "Gunmetal", color: "#4b4e57" },
-  { id: "silver", label: "Brushed Silver", color: "#c7cad1" },
+interface FinishSpec {
+  id: "bronze" | "gunmetal" | "silver" | "black";
+  label: string;
+  color: string;
+  metalness: number;
+  roughness: number;
+  clearcoat: number;
+  clearcoatRoughness: number;
+}
+
+const FINISHES: readonly FinishSpec[] = [
+  {
+    id: "bronze",
+    label: "Satin Bronze",
+    color: "#9B7A4C",
+    metalness: 0.96,
+    roughness: 0.32,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.34,
+  },
+  {
+    id: "gunmetal",
+    label: "Gunmetal",
+    color: "#4B4E57",
+    metalness: 0.98,
+    roughness: 0.28,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.28,
+  },
+  {
+    id: "silver",
+    label: "Brushed Silver",
+    color: "#C7CAD1",
+    metalness: 1.0,
+    roughness: 0.22,
+    clearcoat: 0.42,
+    clearcoatRoughness: 0.2,
+  },
+  {
+    id: "black",
+    label: "Matte Black",
+    color: "#1D1F24",
+    metalness: 0.85,
+    roughness: 0.48,
+    clearcoat: 0.12,
+    clearcoatRoughness: 0.5,
+  },
 ] as const;
-type FinishId = (typeof FINISHES)[number]["id"];
+
+type FinishId = FinishSpec["id"];
 
 const TWO_PI = Math.PI * 2;
 const TIRE_RADIUS = 1.8;
-const SPOKE_COUNT = 5; // each spoke forks into 2 arms -> 10 contact points
+const SPOKE_COUNT = 5;
 const SPOKE_ANGLES = Array.from(
   { length: SPOKE_COUNT },
   (_, i) => (i * TWO_PI) / SPOKE_COUNT + Math.PI / 2,
 );
+
+const DEFAULT_CAMERA_POS = new THREE.Vector3(0, 0.4, 8.2);
+const DEFAULT_DISTANCE = DEFAULT_CAMERA_POS.length();
+const MIN_DISTANCE = 5.6;
+const MAX_DISTANCE = 9.8;
+const ZOOM_STEP = 0.85;
 
 /* ------------------------------------------------------------------ */
 /* Geometry builders                                                   */
 /* Wheel axis = Z (faces the camera). Built once, never per frame.     */
 /* ------------------------------------------------------------------ */
 
-/** Revolve a [radius, axial] profile around the Z axis. */
 function lathe(profile: [number, number][], segments = 128) {
   const g = new THREE.LatheGeometry(
     profile.map(([r, a]) => new THREE.Vector2(r, a)),
     segments,
   );
-  g.rotateX(Math.PI / 2); // lathe axis Y -> wheel axis Z
+  g.rotateX(Math.PI / 2);
   return g;
 }
 
@@ -55,13 +113,12 @@ function buildTire() {
     [1.79, -0.2],
     [TIRE_RADIUS, -0.17],
   ];
-  // three circumferential tread grooves
   for (const g of [-0.095, 0, 0.095]) {
     p.push(
-      [TIRE_RADIUS, g - 0.022],
-      [TIRE_RADIUS - 0.028, g - 0.016],
-      [TIRE_RADIUS - 0.028, g + 0.016],
-      [TIRE_RADIUS, g + 0.022],
+      [TIRE_RADIUS, g - 0.014],
+      [TIRE_RADIUS - 0.018, g - 0.008],
+      [TIRE_RADIUS - 0.018, g + 0.008],
+      [TIRE_RADIUS, g + 0.014],
     );
   }
   p.push(
@@ -73,112 +130,100 @@ function buildTire() {
     [1.4, 0.27],
     [1.34, 0.25],
   );
-  return lathe(p, 160);
+  return lathe(p, 128);
 }
 
 function buildBarrel() {
-  return lathe([
-    [1.26, -0.28],
-    [1.255, 0.0],
-    [1.265, 0.2],
-    [1.3, 0.27],
-    [1.36, 0.295],
-    [1.385, 0.28],
-    [1.39, 0.24],
-    [1.36, 0.15],
-    [1.355, -0.25],
-  ]);
+  return lathe(
+    [
+      [1.35, -0.32],
+      [1.31, -0.32],
+      [1.26, -0.24],
+      [1.24, 0.05],
+      [1.29, 0.22],
+      [1.34, 0.27],
+      [1.36, 0.295],
+      [1.31, 0.3],
+      [1.24, 0.26],
+      [1.19, 0.12],
+      [1.24, -0.26],
+    ],
+    128,
+  );
 }
 
 function buildHub() {
   return lathe(
     [
-      [0, 0.17],
-      [0.14, 0.17],
-      [0.22, 0.16],
-      [0.34, 0.125],
-      [0.41, 0.06],
-      [0.43, 0.0],
-      [0.43, -0.06],
-      [0, -0.06],
+      [0.38, -0.02],
+      [0.36, 0.05],
+      [0.24, 0.1],
+      [0.2, 0.12],
+      [0.14, 0.12],
+      [0.14, 0.02],
     ],
-    96,
+    64,
   );
 }
 
 function buildNut() {
   return lathe(
     [
-      [0, 0.22],
-      [0.12, 0.22],
-      [0.19, 0.2],
-      [0.2, 0.15],
-      [0.2, 0.12],
-      [0, 0.12],
+      [0.19, 0.08],
+      [0.2, 0.13],
+      [0.16, 0.19],
+      [0.11, 0.22],
+      [0.06, 0.235],
+      [0.0, 0.235],
     ],
     64,
   );
 }
 
-/** Y-spoke: one stem that forks into two arms. Extruded + beveled. */
+/** Single Y-spoke: base tapers out then splits into two arms at r = 0.64 */
 function buildSpoke() {
-  const pts: [number, number][] = [
-    [0.3, -0.1],
-    [0.3, 0.1],
-    [0.7, 0.075],
-    [1.22, 0.4],
-    [1.33, 0.33],
-    [0.86, 0.015],
-    [0.86, -0.015],
-    [1.33, -0.33],
-    [1.22, -0.4],
-    [0.7, -0.075],
-  ];
   const s = new THREE.Shape();
-  s.moveTo(...pts[0]);
-  pts.slice(1).forEach(([x, y]) => s.lineTo(x, y));
+  s.moveTo(-0.044, 0.26);
+  s.lineTo(0.044, 0.26);
+  s.lineTo(0.052, 0.62);
+  s.lineTo(0.185, 1.24);
+  s.lineTo(0.125, 1.255);
+  s.lineTo(0.018, 0.72);
+  s.lineTo(0, 0.69);
+  s.lineTo(-0.018, 0.72);
+  s.lineTo(-0.125, 1.255);
+  s.lineTo(-0.185, 1.24);
+  s.lineTo(-0.052, 0.62);
   s.closePath();
+
   const g = new THREE.ExtrudeGeometry(s, {
-    depth: 0.07,
+    depth: 0.072,
     bevelEnabled: true,
-    bevelThickness: 0.02,
-    bevelSize: 0.014,
+    bevelThickness: 0.014,
+    bevelSize: 0.01,
     bevelSegments: 3,
-    curveSegments: 1,
+    curveSegments: 16,
   });
-  g.translate(0, 0, -0.035);
+  g.translate(0, 0, -0.036);
   return g;
 }
 
-/** Cross-drilled disc with centre hole. */
 function buildRotor() {
-  const s = new THREE.Shape();
-  s.absarc(0, 0, 1.02, 0, TWO_PI, false);
-  const centre = new THREE.Path();
-  centre.absarc(0, 0, 0.44, 0, TWO_PI, true);
-  s.holes.push(centre);
-  const rings = [
-    { r: 0.64, off: 0 },
-    { r: 0.84, off: Math.PI / 36 },
-  ];
-  for (const { r, off } of rings) {
-    for (let i = 0; i < 36; i++) {
-      const a = off + (i * TWO_PI) / 36;
-      const h = new THREE.Path();
-      h.absarc(Math.cos(a) * r, Math.sin(a) * r, 0.022, 0, TWO_PI, true);
-      s.holes.push(h);
-    }
-  }
-  const g = new THREE.ExtrudeGeometry(s, {
-    depth: 0.05,
-    bevelEnabled: false,
-    curveSegments: 20,
-  });
-  g.translate(0, 0, -0.025);
-  return g;
+  return lathe(
+    [
+      [0.52, -0.03],
+      [0.52, 0.04],
+      [0.64, 0.04],
+      [0.64, 0.025],
+      [1.06, 0.025],
+      [1.06, -0.025],
+      [0.64, -0.025],
+      [0.64, -0.03],
+    ],
+    96,
+  );
 }
 
-/** Curved monoblock caliper that wraps the rotor edge. */
 function buildCaliper() {
   const s = new THREE.Shape();
   s.absarc(0, 0, 1.1, -0.42, 0.42, false);
@@ -200,19 +245,81 @@ function buildCaliper() {
 /* Wheel                                                               */
 /* ------------------------------------------------------------------ */
 
+function stepFinishMaterial(
+  material: THREE.MeshPhysicalMaterial,
+  targetColor: THREE.Color,
+  spec: FinishSpec,
+  t: number,
+  snap: boolean,
+): boolean {
+  if (snap) {
+    material.color.copy(targetColor);
+    material.metalness = spec.metalness;
+    material.roughness = spec.roughness;
+    material.clearcoat = spec.clearcoat;
+    material.clearcoatRoughness = spec.clearcoatRoughness;
+    return true;
+  }
+
+  material.color.lerp(targetColor, t);
+  material.metalness = THREE.MathUtils.lerp(
+    material.metalness,
+    spec.metalness,
+    t,
+  );
+  material.roughness = THREE.MathUtils.lerp(
+    material.roughness,
+    spec.roughness,
+    t,
+  );
+  material.clearcoat = THREE.MathUtils.lerp(
+    material.clearcoat,
+    spec.clearcoat,
+    t,
+  );
+  material.clearcoatRoughness = THREE.MathUtils.lerp(
+    material.clearcoatRoughness,
+    spec.clearcoatRoughness,
+    t,
+  );
+
+  const dr = Math.abs(material.color.r - targetColor.r);
+  const dg = Math.abs(material.color.g - targetColor.g);
+  const db = Math.abs(material.color.b - targetColor.b);
+  const dRough = Math.abs(material.roughness - spec.roughness);
+
+  if (dr + dg + db + dRough < 0.002) {
+    material.color.copy(targetColor);
+    material.metalness = spec.metalness;
+    material.roughness = spec.roughness;
+    material.clearcoat = spec.clearcoat;
+    material.clearcoatRoughness = spec.clearcoatRoughness;
+    return true;
+  }
+
+  return false;
+}
+
 function Wheel({
-  finishColor,
+  finishSpec,
   reduced,
   dragging,
+  resetSignal,
 }: {
-  finishColor: string;
+  finishSpec: FinishSpec;
   reduced: boolean;
   dragging: React.MutableRefObject<boolean>;
+  resetSignal: number;
 }) {
   const group = useRef<THREE.Group>(null);
   const phase = useRef(0);
   const invalidate = useThree((s) => s.invalidate);
-  const target = useMemo(() => new THREE.Color(finishColor), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const targetColor = useMemo(
+    () => new THREE.Color(finishSpec.color),
+    [finishSpec.color],
+  );
+  const settledRef = useRef(false);
 
   const geo = useMemo(
     () => ({
@@ -237,57 +344,60 @@ function Wheel({
 
   const mat = useMemo(() => {
     const two = THREE.DoubleSide;
+    const initial = FINISHES[0];
     return {
       finish: new THREE.MeshPhysicalMaterial({
-        color: FINISHES[0].color,
-        metalness: 1,
-        roughness: 0.34,
-        clearcoat: 0.35,
-        clearcoatRoughness: 0.35,
+        color: initial.color,
+        metalness: initial.metalness,
+        roughness: initial.roughness,
+        clearcoat: initial.clearcoat,
+        clearcoatRoughness: initial.clearcoatRoughness,
         side: two,
       }),
       polished: new THREE.MeshPhysicalMaterial({
-        color: "#e9eaee",
+        color: "#E9EAEE",
         metalness: 1,
-        roughness: 0.08,
+        roughness: 0.1,
       }),
       tire: new THREE.MeshPhysicalMaterial({
-        color: "#0d0d0f",
-        roughness: 0.9,
+        color: "#0F1013",
+        roughness: 0.88,
         metalness: 0,
-        sheen: 0.5,
-        sheenRoughness: 0.85,
-        sheenColor: new THREE.Color("#2b2b31"),
+        sheen: 0.55,
+        sheenRoughness: 0.82,
+        sheenColor: new THREE.Color("#2D2F36"),
         side: two,
       }),
       rotor: new THREE.MeshPhysicalMaterial({
-        color: "#34353a",
-        metalness: 0.85,
-        roughness: 0.42,
+        color: "#3C3E45",
+        metalness: 0.88,
+        roughness: 0.36,
+        anisotropy: 0.6,
+        clearcoat: 0.12,
       }),
       caliper: new THREE.MeshPhysicalMaterial({
-        color: "#c81e1e",
-        metalness: 0.3,
-        roughness: 0.32,
-        clearcoat: 1,
+        color: "#C81E1E",
+        metalness: 0.32,
+        roughness: 0.3,
+        clearcoat: 0.95,
         clearcoatRoughness: 0.12,
       }),
       nut: new THREE.MeshPhysicalMaterial({
-        color: "#c81e1e",
+        color: "#C81E1E",
         metalness: 0.9,
-        roughness: 0.28,
+        roughness: 0.26,
         clearcoat: 0.6,
       }),
       dark: new THREE.MeshStandardMaterial({
-        color: "#121214",
+        color: "#141518",
         metalness: 0.9,
-        roughness: 0.35,
+        roughness: 0.34,
       }),
       well: new THREE.MeshStandardMaterial({ color: "#060607", roughness: 1 }),
     };
   }, []);
 
-  // Free GPU memory on unmount.
+  // Free GPU memory on unmount
   useEffect(
     () => () => {
       Object.values(geo).forEach((g) => g.dispose());
@@ -296,21 +406,53 @@ function Wheel({
     [geo, mat],
   );
 
-  // Finish change: lerp smoothly, or jump instantly for reduced motion.
+  // Trigger smooth finish transition or snap immediately for reduced motion
   useEffect(() => {
-    target.set(finishColor);
+    settledRef.current = false;
     if (reduced) {
-      mat.finish.color.copy(target);
+      settledRef.current = stepFinishMaterial(
+        mat.finish,
+        targetColor,
+        finishSpec,
+        1,
+        true,
+      );
       invalidate();
     }
-  }, [finishColor, reduced, target, mat, invalidate]);
+  }, [finishSpec, targetColor, reduced, mat, invalidate]);
+
+  // Reset wheel phase when Reset button is pressed
+  useEffect(() => {
+    if (resetSignal > 0) {
+      phase.current = 0;
+      if (group.current) {
+        group.current.rotation.set(0.06, -0.45, 0);
+      }
+      invalidate();
+    }
+  }, [resetSignal, invalidate]);
 
   useFrame((_, delta) => {
-    if (!reduced && !dragging.current) phase.current += delta * 0.45;
-    if (group.current) {
-      group.current.rotation.y = -0.45 + Math.sin(phase.current) * 0.32;
+    const dt = Math.min(delta, 0.05);
+
+    if (!reduced && !dragging.current) {
+      phase.current += dt * 0.4;
+      if (group.current) {
+        group.current.rotation.y = -0.45 + Math.sin(phase.current) * 0.3;
+      }
     }
-    if (!reduced) mat.finish.color.lerp(target, 1 - Math.exp(-delta * 6));
+
+    // Lerp PBR finish properties only until converged
+    if (!reduced && !settledRef.current) {
+      const t = 1 - Math.exp(-dt * 7);
+      settledRef.current = stepFinishMaterial(
+        mat.finish,
+        targetColor,
+        finishSpec,
+        t,
+        false,
+      );
+    }
   });
 
   return (
@@ -324,7 +466,6 @@ function Wheel({
       />
       <mesh geometry={geo.well} material={mat.well} position={[0, 0, -0.32]} />
 
-      {/* Brake rotor + caliper sit behind the spokes */}
       <mesh
         geometry={geo.rotor}
         material={mat.rotor}
@@ -352,7 +493,6 @@ function Wheel({
         />
       ))}
 
-      {/* Centre-lock hub */}
       <group position={[0, 0, 0.06]}>
         <mesh geometry={geo.hub} material={mat.finish} />
         <mesh geometry={geo.nut} material={mat.nut} />
@@ -363,20 +503,27 @@ function Wheel({
 }
 
 /* ------------------------------------------------------------------ */
-/* Scene: baked studio lighting + shadow + controls                    */
+/* Scene: studio lighting + baked environment + bounded camera/zoom   */
 /* ------------------------------------------------------------------ */
 
 function Scene({
-  finishColor,
+  finishSpec,
   reduced,
+  targetDistance,
+  resetSignal,
 }: {
-  finishColor: string;
+  finishSpec: FinishSpec;
   reduced: boolean;
+  targetDistance: number;
+  resetSignal: number;
 }) {
   const dragging = useRef(false);
-  const gl = useThree((s) => s.gl);
+  const controlsRef = useRef<OrbitControlsImpl>(null);
+  const { gl, camera, invalidate } = useThree();
+  const isResettingRef = useRef(false);
+  const lastTargetDistanceRef = useRef(targetDistance);
 
-  // OrbitControls sets touch-action:none, which traps page scroll on mobile.
+  // Preserve vertical page scrolling on touch devices
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       gl.domElement.style.touchAction = "pan-y";
@@ -384,120 +531,199 @@ function Scene({
     return () => cancelAnimationFrame(id);
   }, [gl]);
 
+  // Trigger smooth camera reset when resetSignal increments
+  useEffect(() => {
+    if (resetSignal > 0) {
+      isResettingRef.current = true;
+      invalidate();
+    }
+  }, [resetSignal, invalidate]);
+
+  // Invalidate on demand when zoom buttons are clicked under reduced motion
+  useEffect(() => {
+    if (lastTargetDistanceRef.current !== targetDistance) {
+      lastTargetDistanceRef.current = targetDistance;
+      invalidate();
+    }
+  }, [targetDistance, invalidate]);
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    const t = reduced ? 1 : 1 - Math.exp(-dt * 8);
+
+    if (isResettingRef.current) {
+      camera.position.lerp(DEFAULT_CAMERA_POS, t);
+      if (controlsRef.current) {
+        controlsRef.current.target.lerp(new THREE.Vector3(0, 0, 0), t);
+        controlsRef.current.update();
+      }
+      if (camera.position.distanceTo(DEFAULT_CAMERA_POS) < 0.02) {
+        camera.position.copy(DEFAULT_CAMERA_POS);
+        isResettingRef.current = false;
+      }
+      return;
+    }
+
+    const currentDist = camera.position.length();
+    if (Math.abs(currentDist - targetDistance) > 0.015) {
+      const nextDist = THREE.MathUtils.lerp(currentDist, targetDistance, t);
+      camera.position.setLength(nextDist);
+      controlsRef.current?.update();
+    }
+  });
+
   return (
     <>
-      {/* Custom studio: softboxes + strips + red kicker, rendered once. */}
+      {/* Studio key, rim, and fill lights (zero real-time shadow maps) */}
+      <directionalLight position={[3.5, 5.5, 5]} intensity={1.35} color="#F5F5F3" />
+      <directionalLight position={[-4.5, 2, -4]} intensity={0.9} color="#D4D8E0" />
+      <directionalLight position={[0, -2.5, 4]} intensity={0.35} color="#E4E4E7" />
+
+      {/* Baked studio IBL: softboxes + side strips + subtle crimson rim kicker */}
       <Environment resolution={256} frames={1}>
         <mesh scale={50}>
           <sphereGeometry args={[1, 32, 32]} />
-          <meshBasicMaterial color="#0b0b0d" side={THREE.BackSide} />
+          <meshBasicMaterial color="#0A0A0C" side={THREE.BackSide} />
         </mesh>
         <Lightformer
           form="rect"
-          intensity={4}
+          intensity={3.6}
           position={[0, 6, 4]}
           scale={[12, 3, 1]}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
         <Lightformer
           form="rect"
-          intensity={3}
+          intensity={2.6}
           position={[-6, 1, 3]}
           scale={[1.5, 8, 1]}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
         <Lightformer
           form="rect"
-          intensity={3}
+          intensity={2.6}
           position={[6, 1, 3]}
           scale={[1.5, 8, 1]}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
         <Lightformer
           form="rect"
-          intensity={0.8}
+          intensity={0.7}
           position={[0, 0, 9]}
           scale={[8, 5, 1]}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
         <Lightformer
           form="ring"
-          color="#c81e1e"
-          intensity={2.5}
+          color="#C81E1E"
+          intensity={1.7}
           position={[-4, -2, -6]}
           scale={4}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
         <Lightformer
           form="rect"
-          intensity={0.6}
+          intensity={0.5}
           position={[0, -5, 2]}
           scale={[8, 2, 1]}
           onUpdate={(s) => s.lookAt(0, 0, 0)}
         />
       </Environment>
 
-      <Wheel finishColor={finishColor} reduced={reduced} dragging={dragging} />
+      <Wheel
+        finishSpec={finishSpec}
+        reduced={reduced}
+        dragging={dragging}
+        resetSignal={resetSignal}
+      />
 
-      {/* Baked once: cheap and sharp. */}
       <ContactShadows
         position={[0, -TIRE_RADIUS - 0.02, 0]}
-        opacity={0.65}
+        opacity={0.7}
         scale={7}
-        blur={2.6}
+        blur={2.4}
         far={2.5}
         resolution={512}
         frames={1}
         color="#000000"
       />
 
+      {/* Mouse-wheel zoom disabled so desktop page scrolling is never hijacked */}
       <OrbitControls
+        ref={controlsRef}
         enableZoom={false}
         enablePan={false}
         enableDamping
-        dampingFactor={0.06}
-        rotateSpeed={0.7}
+        dampingFactor={0.055}
+        rotateSpeed={0.65}
+        minDistance={MIN_DISTANCE}
+        maxDistance={MAX_DISTANCE}
         minPolarAngle={Math.PI / 2.5}
         maxPolarAngle={Math.PI / 1.85}
-        onStart={() => (dragging.current = true)}
-        onEnd={() => (dragging.current = false)}
+        onStart={() => {
+          dragging.current = true;
+          isResettingRef.current = false;
+        }}
+        onEnd={() => {
+          dragging.current = false;
+        }}
       />
     </>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Hooks                                                               */
+/* React 19 Safe External Store Hooks                                  */
 /* ------------------------------------------------------------------ */
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const h = () => setReduced(mq.matches);
-    mq.addEventListener("change", h);
-    return () => mq.removeEventListener("change", h);
-  }, []);
-  return reduced;
+function subscribeReducedMotion(callback: () => void) {
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
 }
 
-/** true = ok, false = no WebGL or weak device, null = still checking */
-function useCan3D() {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    try {
-      const c = document.createElement("canvas");
-      const hasGL = !!(c.getContext("webgl2") || c.getContext("webgl"));
-      const nav = navigator as Navigator & { deviceMemory?: number };
-      const weak =
-        (nav.hardwareConcurrency ?? 8) <= 2 || (nav.deviceMemory ?? 8) <= 2;
-      setOk(hasGL && !weak);
-    } catch {
-      setOk(false);
-    }
-  }, []);
-  return ok;
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => false,
+  );
+}
+
+function subscribeVisibility(callback: () => void) {
+  document.addEventListener("visibilitychange", callback);
+  return () => document.removeEventListener("visibilitychange", callback);
+}
+
+function useTabVisible(): boolean {
+  return useSyncExternalStore(
+    subscribeVisibility,
+    () => !document.hidden,
+    () => true,
+  );
+}
+
+function subscribeNoop() {
+  return () => {};
+}
+
+function useCan3D(): boolean | null {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => {
+      try {
+        const c = document.createElement("canvas");
+        const hasGL = !!(c.getContext("webgl2") || c.getContext("webgl"));
+        const nav = navigator as Navigator & { deviceMemory?: number };
+        const weak =
+          (nav.hardwareConcurrency ?? 8) <= 2 || (nav.deviceMemory ?? 8) <= 2;
+        return hasGL && !weak;
+      } catch {
+        return false;
+      }
+    },
+    () => null,
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -513,10 +739,14 @@ export default function ForgedWheel3D({
   const [inView, setInView] = useState(true);
   const [dpr, setDpr] = useState(1.5);
   const [finish, setFinish] = useState<FinishId>("bronze");
+  const [targetDistance, setTargetDistance] = useState(DEFAULT_DISTANCE);
+  const [resetSignal, setResetSignal] = useState(0);
+
   const reduced = useReducedMotion();
+  const tabVisible = useTabVisible();
   const can3D = useCan3D();
 
-  // Stop rendering entirely while off-screen.
+  // Pause rendering when off-screen
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -527,21 +757,37 @@ export default function ForgedWheel3D({
     return () => io.disconnect();
   }, []);
 
-  const current = FINISHES.find((f) => f.id === finish)!;
+  const currentFinish = FINISHES.find((f) => f.id === finish) ?? FINISHES[0];
+
+  const handleZoomIn = useCallback(() => {
+    setTargetDistance((d) => Math.max(MIN_DISTANCE, d - ZOOM_STEP));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setTargetDistance((d) => Math.min(MAX_DISTANCE, d + ZOOM_STEP));
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setTargetDistance(DEFAULT_DISTANCE);
+    setResetSignal((n) => n + 1);
+  }, []);
+
+  const shouldRenderLoop = inView && tabVisible;
 
   return (
     <div
       ref={wrapRef}
+      onDoubleClick={handleReset}
       className="relative h-[420px] w-full cursor-grab overflow-hidden active:cursor-grabbing md:h-[540px]"
       style={{
         background:
-          "radial-gradient(60% 60% at 50% 42%, #1b1b1f 0%, #0b0b0d 55%, #060607 100%)",
+          "radial-gradient(60% 58% at 50% 44%, #1A1B20 0%, #0B0B0D 58%, #080808 100%)",
       }}
     >
       {can3D === true && (
         <Canvas
           dpr={dpr}
-          frameloop={!inView ? "never" : reduced ? "demand" : "always"}
+          frameloop={!shouldRenderLoop ? "never" : reduced ? "demand" : "always"}
           camera={{ position: [0, 0.4, 8.2], fov: 30 }}
           gl={{
             antialias: true,
@@ -551,13 +797,18 @@ export default function ForgedWheel3D({
           onCreated={({ gl }) => {
             gl.toneMappingExposure = 1.05;
           }}
-          aria-label={`Interactive 3D forged wheel, ${current.label} finish. Drag to rotate.`}
+          aria-label={`Interactive 3D forged wheel, ${currentFinish.label} finish. Drag to rotate.`}
         >
           <PerformanceMonitor
             onDecline={() => setDpr(1)}
             onIncline={() => setDpr(1.75)}
           />
-          <Scene finishColor={current.color} reduced={reduced} />
+          <Scene
+            finishSpec={currentFinish}
+            reduced={reduced}
+            targetDistance={targetDistance}
+            resetSignal={resetSignal}
+          />
         </Canvas>
       )}
 
@@ -575,11 +826,46 @@ export default function ForgedWheel3D({
           </div>
         ))}
 
+      {/* Bounded Zoom & Reset View Controls (never hijacks page scroll) */}
+      {can3D === true && (
+        <div className="absolute top-4 right-4 z-10 flex items-center border border-white/10 bg-black/65 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={targetDistance <= MIN_DISTANCE}
+            aria-label="Zoom in"
+            className="h-9 w-9 flex items-center justify-center text-zinc-300 hover:text-[#F5F5F3] hover:bg-white/5 transition-colors disabled:opacity-35 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+          <span className="h-5 w-[1px] bg-white/10" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={targetDistance >= MAX_DISTANCE}
+            aria-label="Zoom out"
+            className="h-9 w-9 flex items-center justify-center text-zinc-300 hover:text-[#F5F5F3] hover:bg-white/5 transition-colors disabled:opacity-35 cursor-pointer"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span className="h-5 w-[1px] bg-white/10" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={handleReset}
+            aria-label="Reset camera view"
+            className="h-9 px-3 flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase text-zinc-300 hover:text-[#F5F5F3] hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+        </div>
+      )}
+
       {/* Finish selector */}
       <div
         role="radiogroup"
         aria-label="Wheel finish"
-        className="absolute bottom-4 left-4 flex items-center gap-3 border border-white/10 bg-black/60 px-3 py-2 backdrop-blur"
+        className="absolute bottom-4 left-4 z-10 flex items-center gap-3 border border-white/10 bg-black/65 px-3 py-2 backdrop-blur-sm"
       >
         {FINISHES.map((f) => (
           <button
@@ -589,7 +875,7 @@ export default function ForgedWheel3D({
             aria-checked={finish === f.id}
             aria-label={f.label}
             onClick={() => setFinish(f.id)}
-            className={`h-5 w-5 rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 ${
+            className={`h-6 w-6 rounded-full border transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C81E1E] ${
               finish === f.id
                 ? "scale-110 border-white"
                 : "border-white/20 hover:border-white/60"
@@ -597,8 +883,8 @@ export default function ForgedWheel3D({
             style={{ background: f.color }}
           />
         ))}
-        <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-400">
-          {current.label}
+        <span className="text-[10px] uppercase tracking-[0.22em] text-zinc-300">
+          {currentFinish.label}
         </span>
       </div>
     </div>
