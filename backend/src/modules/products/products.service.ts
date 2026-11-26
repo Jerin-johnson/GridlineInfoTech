@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FilterQuery, Types } from 'mongoose';
+import { ClientSession, FilterQuery, Types } from 'mongoose';
 import { BrandsService } from '../brands/brands.service';
 import { CategoriesService } from '../categories/categories.service';
 import { CloudinaryService } from '../uploads/services/cloudinary.service';
@@ -448,6 +448,36 @@ export class ProductsService {
         totalPages,
       },
     };
+  }
+
+  async reserveStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID format');
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+
+    return this.productRepository.reserveStock(productId, quantity, session);
+  }
+
+  async releaseStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID format');
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+
+    return this.productRepository.releaseStock(productId, quantity, session);
   }
 
   private formatProduct(product: ProductDocument): FormattedProduct {

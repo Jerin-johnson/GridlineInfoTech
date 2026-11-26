@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, Types } from 'mongoose';
+import { ClientSession, FilterQuery, Model, Types } from 'mongoose';
 import {
   IProductRepository,
   ProductQueryResult,
@@ -123,5 +123,40 @@ export class MongoProductRepository implements IProductRepository {
         status: { $ne: 'archived' },
       })
       .exec();
+  }
+
+  async reserveStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    const result = await this.productModel.updateOne(
+      {
+        _id: new Types.ObjectId(productId),
+        status: 'published',
+        $expr: {
+          $gte: [{ $subtract: ['$stock', '$reservedStock'] }, quantity],
+        },
+      },
+      { $inc: { reservedStock: quantity } },
+      { session },
+    );
+    return result.modifiedCount === 1;
+  }
+
+  async releaseStock(
+    productId: string,
+    quantity: number,
+    session?: ClientSession,
+  ): Promise<boolean> {
+    const result = await this.productModel.updateOne(
+      {
+        _id: new Types.ObjectId(productId),
+        reservedStock: { $gte: quantity },
+      },
+      { $inc: { reservedStock: -quantity } },
+      { session },
+    );
+    return result.modifiedCount === 1;
   }
 }

@@ -1,0 +1,470 @@
+/// <reference types="jest" />
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { Types } from 'mongoose';
+import { CartService } from '../../cart/cart.service';
+import { ProductsService } from '../../products/products.service';
+import { UsersService } from '../../users/users.service';
+import { ORDER_REPOSITORY } from '../constants/order.constants';
+import { OrdersService } from '../orders.service';
+
+describe('OrdersService', () => {
+  let service: OrdersService;
+  let mockOrderRepository: {
+    create: jest.Mock;
+    findByIdAndUser: jest.Mock;
+    findByIdempotencyKey: jest.Mock;
+    findAllByUser: jest.Mock;
+    cancelOrderAtomically: jest.Mock;
+  };
+  let mockCartService: {
+    getCart: jest.Mock;
+    clearCart: jest.Mock;
+  };
+  let mockProductsService: {
+    findById: jest.Mock;
+    reserveStock: jest.Mock;
+    releaseStock: jest.Mock;
+  };
+  let mockUsersService: {
+    getProfile: jest.Mock;
+    getAddresses: jest.Mock;
+  };
+
+  const userId = new Types.ObjectId().toString();
+  const addressId = new Types.ObjectId().toString();
+  const prodId1 = new Types.ObjectId().toString();
+  const prodId2 = new Types.ObjectId().toString();
+  const orderId = new Types.ObjectId().toString();
+
+  const mockAddress = {
+    _id: new Types.ObjectId(addressId),
+    label: 'Home',
+    fullName: 'Alex Vance',
+    phone: '+1-555-0199',
+    line1: '742 Evergreen Terrace',
+    line2: 'Apt 4B',
+    city: 'Springfield',
+    state: 'IL',
+    postalCode: '62704',
+    country: 'US',
+    isDefault: true,
+  };
+
+  const mockUserProfile = {
+    id: userId,
+    firstName: 'Alex',
+    lastName: 'Vance',
+    email: 'alex@gridline.com',
+    authProvider: 'local',
+    role: 'customer',
+    isActive: true,
+    isEmailVerified: true,
+  };
+
+  const makeMockOrderDoc = (overrides: Record<string, unknown> = {}) => {
+    const base = {
+      _id: new Types.ObjectId(orderId),
+      orderNumber: 'ORD-20261126-ABC123',
+      paymentReference: 'PAY-1234567890ABCDEF',
+      user: new Types.ObjectId(userId),
+      customerEmail: 'alex@gridline.com',
+      items: [
+        {
+          product: new Types.ObjectId(prodId1),
+          name: 'Brembo Brake Rotor',
+          sku: 'BRM-01',
+          slug: 'brembo-brake-rotor',
+          image: 'https://img.com/rotor.jpg',
+          unitPrice: 35000,
+          quantity: 2,
+          lineTotal: 70000,
+        },
+      ],
+      shippingAddress: {
+        addressId: new Types.ObjectId(addressId),
+        label: 'Home',
+        fullName: 'Alex Vance',
+        phone: '+1-555-0199',
+        line1: '742 Evergreen Terrace',
+        line2: 'Apt 4B',
+        city: 'Springfield',
+        state: 'IL',
+        postalCode: '62704',
+        country: 'US',
+      },
+      subtotal: 70000,
+      shippingCost: 0,
+      taxAmount: 0,
+      totalAmount: 70000,
+      currency: 'USD',
+      paymentMethod: 'crypto_wallet',
+      paymentStatus: 'pending',
+      fulfilmentStatus: 'placed',
+      statusHistory: [
+        {
+          status: 'placed',
+          note: 'Order placed and awaiting payment',
+          actor: 'customer',
+          changedAt: new Date(),
+        },
+      ],
+      stockReserved: true,
+      paymentExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    };
+
+    return {
+      ...base,
+      toObject() {
+        return { ...base };
+      },
+    };
+  };
+
+  beforeEach(async () => {
+    mockOrderRepository = {
+      create: jest.fn(),
+      findByIdAndUser: jest.fn(),
+      findByIdempotencyKey: jest.fn(),
+      findAllByUser: jest.fn(),
+      cancelOrderAtomically: jest.fn(),
+    };
+
+    mockCartService = {
+      getCart: jest.fn(),
+      clearCart: jest.fn().mockResolvedValue({ items: [] }),
+    };
+
+    mockProductsService = {
+      findById: jest.fn(),
+      reserveStock: jest.fn().mockResolvedValue(true),
+      releaseStock: jest.fn().mockResolvedValue(true),
+    };
+
+    mockUsersService = {
+      getProfile: jest.fn().mockResolvedValue(mockUserProfile),
+      getAddresses: jest.fn().mockResolvedValue([mockAddress]),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: ORDER_REPOSITORY, useValue: mockOrderRepository },
+        { provide: CartService, useValue: mockCartService },
+        { provide: ProductsService, useValue: mockProductsService },
+        { provide: UsersService, useValue: mockUsersService },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('checkout', () => {
+    it('should reject invalid userId or addressId', async () => {
+      await expect(
+        service.checkout('invalid-user', { addressId }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.checkout(userId, { addressId: 'invalid-address' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject duplicate idempotencyKey', async () => {
+      mockOrderRepository.findByIdempotencyKey.mockResolvedValue(
+        makeMockOrderDoc(),
+      );
+
+      await expect(
+        service.checkout(userId, { addressId, idempotencyKey: 'key-123' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should reject when delivery address does not belong to user', async () => {
+      const otherAddressId = new Types.ObjectId().toString();
+      mockCartService.getCart.mockResolvedValue({ items: [] });
+
+      await expect(
+        service.checkout(userId, { addressId: otherAddressId }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject checkout with an empty cart', async () => {
+      mockCartService.getCart.mockResolvedValue({ items: [] });
+
+      await expect(service.checkout(userId, { addressId })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should reject unavailable or unpublished products', async () => {
+      mockCartService.getCart.mockResolvedValue({
+        items: [{ productId: prodId1, name: 'Rotor', quantity: 1 }],
+      });
+      mockProductsService.findById.mockResolvedValue({
+        _id: prodId1,
+        name: 'Rotor',
+        status: 'draft',
+        price: 35000,
+        availableStock: 5,
+      });
+
+      await expect(service.checkout(userId, { addressId })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should reject when requested quantity exceeds availableStock', async () => {
+      mockCartService.getCart.mockResolvedValue({
+        items: [{ productId: prodId1, name: 'Rotor', quantity: 10 }],
+      });
+      mockProductsService.findById.mockResolvedValue({
+        _id: prodId1,
+        name: 'Rotor',
+        status: 'published',
+        price: 35000,
+        availableStock: 3,
+      });
+
+      await expect(service.checkout(userId, { addressId })).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should recalculate prices from live product data, reserve stock, create order, and clear cart', async () => {
+      // Cart has stale price 100, live product has price 35000
+      mockCartService.getCart.mockResolvedValue({
+        items: [
+          {
+            productId: prodId1,
+            name: 'Stale Name',
+            sku: 'OLD',
+            slug: 'old',
+            price: 100,
+            quantity: 2,
+          },
+        ],
+      });
+      mockProductsService.findById.mockResolvedValue({
+        _id: prodId1,
+        name: 'Brembo Brake Rotor',
+        sku: 'BRM-01',
+        slug: 'brembo-brake-rotor',
+        status: 'published',
+        price: 35000,
+        availableStock: 8,
+        images: [{ url: 'https://img.com/rotor.jpg', isPrimary: true }],
+      });
+      mockOrderRepository.create.mockImplementation((payload) =>
+        Promise.resolve(makeMockOrderDoc(payload)),
+      );
+
+      const result = await service.checkout(userId, {
+        addressId,
+        notes: 'Leave at porch',
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(mockProductsService.reserveStock).toHaveBeenCalledWith(
+        prodId1,
+        2,
+        undefined,
+      );
+      expect(mockOrderRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerEmail: 'alex@gridline.com',
+          subtotal: 70000,
+          shippingCost: 0,
+          taxAmount: 0,
+          totalAmount: 70000,
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'placed',
+          stockReserved: true,
+          idempotencyKey: 'idem-1',
+          notes: 'Leave at porch',
+        }),
+        undefined,
+      );
+      expect(mockCartService.clearCart).toHaveBeenCalledWith(userId);
+      expect(result.subtotal).toBe(70000);
+      expect(result.totalAmount).toBe(70000);
+      expect(result.paymentStatus).toBe('pending');
+      expect(result.fulfilmentStatus).toBe('placed');
+    });
+
+    it('should compensate reserved stock if a subsequent item fails reservation', async () => {
+      mockCartService.getCart.mockResolvedValue({
+        items: [
+          { productId: prodId1, name: 'Item 1', quantity: 2 },
+          { productId: prodId2, name: 'Item 2', quantity: 1 },
+        ],
+      });
+      mockProductsService.findById
+        .mockResolvedValueOnce({
+          _id: prodId1,
+          name: 'Item 1',
+          sku: 'SKU-1',
+          slug: 'item-1',
+          status: 'published',
+          price: 1000,
+          availableStock: 5,
+          images: [],
+        })
+        .mockResolvedValueOnce({
+          _id: prodId2,
+          name: 'Item 2',
+          sku: 'SKU-2',
+          slug: 'item-2',
+          status: 'published',
+          price: 2000,
+          availableStock: 5,
+          images: [],
+        });
+
+      mockProductsService.reserveStock
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      await expect(service.checkout(userId, { addressId })).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(mockProductsService.releaseStock).toHaveBeenCalledWith(prodId1, 2);
+      expect(mockOrderRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should convert Mongo duplicate key error (11000) into ConflictException', async () => {
+      mockCartService.getCart.mockResolvedValue({
+        items: [{ productId: prodId1, name: 'Rotor', quantity: 1 }],
+      });
+      mockProductsService.findById.mockResolvedValue({
+        _id: prodId1,
+        name: 'Rotor',
+        sku: 'SKU-1',
+        slug: 'rotor',
+        status: 'published',
+        price: 1000,
+        availableStock: 5,
+        images: [],
+      });
+      mockOrderRepository.create.mockRejectedValue({ code: 11000 });
+
+      await expect(service.checkout(userId, { addressId })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockProductsService.releaseStock).toHaveBeenCalledWith(prodId1, 1);
+    });
+  });
+
+  describe('findUserOrders & findUserOrderById', () => {
+    it('should return paginated orders for authenticated user', async () => {
+      mockOrderRepository.findAllByUser.mockResolvedValue({
+        data: [makeMockOrderDoc()],
+        total: 1,
+      });
+
+      const res = await service.findUserOrders(userId, { page: 1, limit: 10 });
+      expect(res.data).toHaveLength(1);
+      expect(res.meta).toEqual({
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      });
+    });
+
+    it('should throw BadRequestException for invalid orderId', async () => {
+      await expect(service.findUserOrderById(userId, 'bad-id')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw NotFoundException when order is missing or belongs to another user', async () => {
+      mockOrderRepository.findByIdAndUser.mockResolvedValue(null);
+
+      await expect(service.findUserOrderById(userId, orderId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('cancelOrder', () => {
+    it('should cancel eligible order and release reserved stock', async () => {
+      const existing = makeMockOrderDoc({
+        fulfilmentStatus: 'placed',
+        paymentStatus: 'pending',
+        stockReserved: true,
+      });
+      const cancelled = makeMockOrderDoc({
+        fulfilmentStatus: 'cancelled',
+        stockReserved: false,
+        cancellationReason: 'Changed my mind',
+      });
+
+      mockOrderRepository.findByIdAndUser.mockResolvedValue(existing);
+      mockOrderRepository.cancelOrderAtomically.mockResolvedValue(cancelled);
+
+      const res = await service.cancelOrder(userId, orderId, {
+        reason: 'Changed my mind',
+      });
+
+      expect(res.fulfilmentStatus).toBe('cancelled');
+      expect(mockProductsService.releaseStock).toHaveBeenCalledWith(
+        prodId1,
+        2,
+        undefined,
+      );
+    });
+
+    it('should reject cancellation if order is already shipped', async () => {
+      mockOrderRepository.findByIdAndUser.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'shipped',
+          paymentStatus: 'paid',
+        }),
+      );
+
+      await expect(service.cancelOrder(userId, orderId, {})).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should reject cancellation if payment is already paid or confirming', async () => {
+      mockOrderRepository.findByIdAndUser.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'placed',
+          paymentStatus: 'confirming',
+        }),
+      );
+
+      await expect(service.cancelOrder(userId, orderId, {})).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw ConflictException if concurrent state change prevents atomic cancel', async () => {
+      mockOrderRepository.findByIdAndUser.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'placed',
+          paymentStatus: 'pending',
+        }),
+      );
+      mockOrderRepository.cancelOrderAtomically.mockResolvedValue(null);
+
+      await expect(service.cancelOrder(userId, orderId, {})).rejects.toThrow(
+        ConflictException,
+      );
+    });
+  });
+});
