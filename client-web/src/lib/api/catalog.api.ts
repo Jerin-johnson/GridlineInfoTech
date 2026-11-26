@@ -3,6 +3,7 @@ import type {
   BrandsResponse,
   CatalogBrand,
   CatalogCategory,
+  CatalogProduct,
   CatalogSortOption,
   CategoriesResponse,
   PaginatedProductsResponse,
@@ -114,4 +115,41 @@ export function resolveEntityIdBySlugOrId<
       item._id === value || item.slug.toLowerCase() === normalized,
   );
   return found?._id;
+}
+
+interface SingleProductResponse {
+  message: string;
+  data: CatalogProduct;
+}
+
+interface RelatedProductsResponse {
+  message: string;
+  data: CatalogProduct[];
+}
+
+export async function getProductBySlug(slug: string): Promise<CatalogProduct> {
+  const encoded = encodeURIComponent(slug.trim().toLowerCase());
+  const res = await apiFetch<SingleProductResponse>(
+    `/products/slug/${encoded}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+  return res.data;
+}
+
+export async function getRelatedProducts(
+  idOrSlug: string,
+  limit = 4,
+): Promise<CatalogProduct[]> {
+  const encoded = encodeURIComponent(idOrSlug);
+  const res = await apiFetch<RelatedProductsResponse>(
+    `/products/${encoded}/related?limit=${limit}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+  return res.data ?? [];
 }
