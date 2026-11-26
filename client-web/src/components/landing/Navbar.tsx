@@ -15,6 +15,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { getCurrentUser, logoutUser } from "@/lib/api/auth.api";
+import { CART_UPDATED_EVENT, getCart } from "@/lib/api/cart.api";
 import type { SafeUserProfile } from "@/types/auth.types";
 
 interface NavItem {
@@ -101,6 +102,7 @@ export function Navbar({
   const [authLoading, setAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<SafeUserProfile | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [liveCartCount, setLiveCartCount] = useState(cartCount);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -118,12 +120,22 @@ export function Navbar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Verify backend session via HttpOnly cookie
+  // Verify backend session via HttpOnly cookie and hydrate cart count once if signed in
   useEffect(() => {
     let active = true;
     getCurrentUser()
       .then((user) => {
-        if (active) setCurrentUser(user);
+        if (!active) return;
+        setCurrentUser(user);
+        if (user) {
+          getCart()
+            .then((cart) => {
+              if (active) setLiveCartCount(cart.totalQuantity);
+            })
+            .catch(() => {
+              // Ignore cart hydration failure in navbar
+            });
+        }
       })
       .catch(() => {
         if (active) setCurrentUser(null);
@@ -133,6 +145,20 @@ export function Navbar({
       });
     return () => {
       active = false;
+    };
+  }, []);
+
+  // Listen for cart mutations from storefront pages without re-fetching
+  useEffect(() => {
+    const handleCartUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ totalQuantity?: number }>;
+      if (typeof custom.detail?.totalQuantity === "number") {
+        setLiveCartCount(custom.detail.totalQuantity);
+      }
+    };
+    window.addEventListener(CART_UPDATED_EVENT, handleCartUpdated);
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, handleCartUpdated);
     };
   }, []);
 
@@ -166,6 +192,7 @@ export function Navbar({
       // Clear local state even if session already expired
     } finally {
       setCurrentUser(null);
+      setLiveCartCount(0);
       setAccountMenuOpen(false);
       setMenuOpen(false);
       setIsSigningOut(false);
@@ -397,13 +424,13 @@ export function Navbar({
 
             <Link
               href="/cart"
-              aria-label={`Shopping cart with ${cartCount} items`}
+              aria-label={`Shopping cart with ${liveCartCount} items`}
               className="relative p-1 text-zinc-300 hover:text-white transition-colors focus-visible:outline-1 focus-visible:outline-white/70 focus-visible:outline-offset-4"
             >
               <ShoppingBag className="w-4 h-4" />
-              {cartCount > 0 && (
+              {liveCartCount > 0 && (
                 <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#C81E1E] text-[9px] font-medium flex items-center justify-center text-white tabular-nums">
-                  {cartCount}
+                  {liveCartCount}
                 </span>
               )}
             </Link>
