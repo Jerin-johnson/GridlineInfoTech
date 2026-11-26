@@ -5,6 +5,10 @@ import {
   CANCELLABLE_FULFILMENT_STATUSES,
   CANCELLABLE_PAYMENT_STATUSES,
 } from '../constants/order.constants';
+import type {
+  FulfilmentStatus,
+  PaymentStatus,
+} from '../constants/order.constants';
 import {
   IOrderRepository,
   OrderListFilter,
@@ -114,6 +118,56 @@ export class MongoOrderRepository implements IOrderRepository {
               note: data.historyNote,
               actor: 'customer',
               changedAt: data.cancelledAt,
+            },
+          },
+        },
+        { new: true, session },
+      )
+      .exec();
+  }
+
+  async updatePaymentStateAtomically(
+    orderId: string,
+    userId: string,
+    data: {
+      allowedCurrentPaymentStatuses: PaymentStatus[];
+      allowedCurrentFulfilmentStatuses: FulfilmentStatus[];
+      paymentStatus: PaymentStatus;
+      fulfilmentStatus?: FulfilmentStatus;
+      stockReserved?: boolean;
+      historyStatus: string;
+      historyNote: string;
+      actor?: string;
+      changedAt: Date;
+    },
+    session?: ClientSession,
+  ): Promise<OrderDocument | null> {
+    const setFields: Record<string, unknown> = {
+      paymentStatus: data.paymentStatus,
+    };
+    if (data.fulfilmentStatus !== undefined) {
+      setFields.fulfilmentStatus = data.fulfilmentStatus;
+    }
+    if (data.stockReserved !== undefined) {
+      setFields.stockReserved = data.stockReserved;
+    }
+
+    return this.orderModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(orderId),
+          user: new Types.ObjectId(userId),
+          paymentStatus: { $in: data.allowedCurrentPaymentStatuses },
+          fulfilmentStatus: { $in: data.allowedCurrentFulfilmentStatuses },
+        },
+        {
+          $set: setFields,
+          $push: {
+            statusHistory: {
+              status: data.historyStatus,
+              note: data.historyNote,
+              actor: data.actor ?? 'system',
+              changedAt: data.changedAt,
             },
           },
         },

@@ -15,4 +15,18 @@ export const configValidationSchema = Joi.object({
   CLOUDINARY_CLOUD_NAME: Joi.string().optional(),
   CLOUDINARY_API_KEY: Joi.string().optional(),
   CLOUDINARY_API_SECRET: Joi.string().optional(),
+  CRYPTO_RPC_URL: Joi.string().uri().optional().allow(''),
+  CRYPTO_CHAIN_ID: Joi.number().integer().default(11155111),
+  CRYPTO_NETWORK: Joi.string().default('Sepolia'),
+  CRYPTO_TOKEN_SYMBOL: Joi.string().default('USDC'),
+  CRYPTO_TOKEN_ADDRESS: Joi.string()
+    .pattern(/^0x[a-fA-F0-9]{40}$/)
+    .optional()
+    .allow(''),
+  CRYPTO_TOKEN_DECIMALS: Joi.number().integer().min(0).max(18).default(6),
+  CRYPTO_REQUIRED_CONFIRMATIONS: Joi.number().integer().min(1).default(3),
+  PAYMENT_WALLET_ADDRESS: Joi.string()
+    .pattern(/^0x[a-fA-F0-9]{40}$/)
+    .optional()
+    .allow(''),
 });
