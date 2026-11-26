@@ -1,8 +1,5 @@
 /// <reference types="jest" />
-import {
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
@@ -106,9 +103,9 @@ describe('PaymentsService', () => {
 
   beforeEach(async () => {
     mockPaymentRepository = {
-      create: jest.fn().mockImplementation((data) =>
-        Promise.resolve(makePaymentDoc(data)),
-      ),
+      create: jest
+        .fn()
+        .mockImplementation((data) => Promise.resolve(makePaymentDoc(data))),
       save: jest.fn().mockImplementation((doc) => Promise.resolve(doc)),
       findLatestByOrderAndUser: jest.fn().mockResolvedValue(null),
       findByOrderAndTxHash: jest.fn().mockResolvedValue(null),
@@ -179,7 +176,9 @@ describe('PaymentsService', () => {
       destinationAddress: merchantAddress,
       requiredConfirmations: 3,
     });
-    expect((config as unknown as Record<string, unknown>).rpcUrl).toBeUndefined();
+    expect(
+      (config as unknown as Record<string, unknown>).rpcUrl,
+    ).toBeUndefined();
   });
 
   describe('initiatePayment', () => {

@@ -93,7 +93,12 @@ describe('BlockchainVerifierService', () => {
   it('should return reverted when receipt status is 0x0', async () => {
     mockRpcResponses({
       eth_chainId: '0xaa36a7',
-      eth_getTransactionByHash: { hash: txHash, from: senderAddress, to: tokenAddress, value: '0x0' },
+      eth_getTransactionByHash: {
+        hash: txHash,
+        from: senderAddress,
+        to: tokenAddress,
+        value: '0x0',
+      },
       eth_getTransactionReceipt: {
         transactionHash: txHash,
         status: '0x0',
@@ -117,7 +122,12 @@ describe('BlockchainVerifierService', () => {
   it('should return wrong_token when no ERC-20 Transfer log matches expected token contract', async () => {
     mockRpcResponses({
       eth_chainId: '0xaa36a7',
-      eth_getTransactionByHash: { hash: txHash, from: senderAddress, to: tokenAddress, value: '0x0' },
+      eth_getTransactionByHash: {
+        hash: txHash,
+        from: senderAddress,
+        to: tokenAddress,
+        value: '0x0',
+      },
       eth_getTransactionReceipt: {
         transactionHash: txHash,
         status: '0x1',
@@ -152,7 +162,12 @@ describe('BlockchainVerifierService', () => {
   it('should return underpaid when ERC-20 Transfer amount is less than expectedAmount', async () => {
     mockRpcResponses({
       eth_chainId: '0xaa36a7',
-      eth_getTransactionByHash: { hash: txHash, from: senderAddress, to: tokenAddress, value: '0x0' },
+      eth_getTransactionByHash: {
+        hash: txHash,
+        from: senderAddress,
+        to: tokenAddress,
+        value: '0x0',
+      },
       eth_getTransactionReceipt: {
         transactionHash: txHash,
         status: '0x1',
@@ -188,7 +203,12 @@ describe('BlockchainVerifierService', () => {
   it('should return overpaid when ERC-20 Transfer amount exceeds expectedAmount', async () => {
     mockRpcResponses({
       eth_chainId: '0xaa36a7',
-      eth_getTransactionByHash: { hash: txHash, from: senderAddress, to: tokenAddress, value: '0x0' },
+      eth_getTransactionByHash: {
+        hash: txHash,
+        from: senderAddress,
+        to: tokenAddress,
+        value: '0x0',
+      },
       eth_getTransactionReceipt: {
         transactionHash: txHash,
         status: '0x1',
@@ -224,7 +244,12 @@ describe('BlockchainVerifierService', () => {
   it('should return valid with exact confirmations for matching ERC-20 Transfer event', async () => {
     mockRpcResponses({
       eth_chainId: '0xaa36a7',
-      eth_getTransactionByHash: { hash: txHash, from: senderAddress, to: tokenAddress, value: '0x0' },
+      eth_getTransactionByHash: {
+        hash: txHash,
+        from: senderAddress,
+        to: tokenAddress,
+        value: '0x0',
+      },
       eth_getTransactionReceipt: {
         transactionHash: txHash,
         status: '0x1',

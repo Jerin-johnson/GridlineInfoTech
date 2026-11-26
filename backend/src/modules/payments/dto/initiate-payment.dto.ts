@@ -1,11 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsInt,
-  IsMongoId,
-  IsOptional,
-  Matches,
-  Min,
-} from 'class-validator';
+import { IsInt, IsMongoId, IsOptional, Matches, Min } from 'class-validator';
 
 export class InitiatePaymentDto {
   @IsMongoId({ message: 'orderId must be a valid MongoDB ObjectId' })

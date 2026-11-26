@@ -67,7 +67,10 @@ export class PaymentsService {
     userId: string,
     dto: InitiatePaymentDto,
   ): Promise<FormattedPayment> {
-    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(dto.orderId)) {
+    if (
+      !Types.ObjectId.isValid(userId) ||
+      !Types.ObjectId.isValid(dto.orderId)
+    ) {
       throw new BadRequestException('Invalid user or order ID format');
     }
 
@@ -126,7 +129,9 @@ export class PaymentsService {
       return this.formatPayment(updated);
     }
 
-    const existingCount = await this.paymentRepository.countByOrder(dto.orderId);
+    const existingCount = await this.paymentRepository.countByOrder(
+      dto.orderId,
+    );
     const attemptNumber = existingCount + 1;
     const paymentReference =
       attemptNumber === 1
@@ -161,7 +166,10 @@ export class PaymentsService {
     userId: string,
     dto: VerifyPaymentDto,
   ): Promise<FormattedPayment> {
-    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(dto.orderId)) {
+    if (
+      !Types.ObjectId.isValid(userId) ||
+      !Types.ObjectId.isValid(dto.orderId)
+    ) {
       throw new BadRequestException('Invalid user or order ID format');
     }
 
@@ -244,7 +252,10 @@ export class PaymentsService {
       });
     }
 
-    if (order.fulfilmentStatus === 'cancelled' && order.paymentStatus !== 'expired') {
+    if (
+      order.fulfilmentStatus === 'cancelled' &&
+      order.paymentStatus !== 'expired'
+    ) {
       throw new BadRequestException('Cancelled orders cannot be paid');
     }
 
@@ -252,14 +263,16 @@ export class PaymentsService {
       order.paymentStatus === 'expired' ||
       new Date(order.paymentExpiresAt).getTime() <= Date.now();
 
-    const verification = await this.blockchainVerifierService.verifyTransaction({
-      transactionHash: txHash,
-      expectedChainId: config.chainId,
-      expectedTokenAddress: config.tokenAddress,
-      expectedDestinationAddress: config.destinationAddress,
-      expectedSenderAddress: walletAddress,
-      expectedAmount,
-    });
+    const verification = await this.blockchainVerifierService.verifyTransaction(
+      {
+        transactionHash: txHash,
+        expectedChainId: config.chainId,
+        expectedTokenAddress: config.tokenAddress,
+        expectedDestinationAddress: config.destinationAddress,
+        expectedSenderAddress: walletAddress,
+        expectedAmount,
+      },
+    );
 
     if (isOrderExpired) {
       const reason =

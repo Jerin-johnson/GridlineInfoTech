@@ -147,12 +147,14 @@ describe('Crypto Payments API (e2e)', () => {
   };
 
   const mockOrderRepository = {
-    findByIdAndUser: jest.fn().mockImplementation((oId: string, uId: string) => {
-      const found = ordersStore.find(
-        (o) => o._id.toString() === oId && o.user.toString() === uId,
-      );
-      return Promise.resolve(found ?? null);
-    }),
+    findByIdAndUser: jest
+      .fn()
+      .mockImplementation((oId: string, uId: string) => {
+        const found = ordersStore.find(
+          (o) => o._id.toString() === oId && o.user.toString() === uId,
+        );
+        return Promise.resolve(found ?? null);
+      }),
     updatePaymentStateAtomically: jest
       .fn()
       .mockImplementation((oId: string, uId: string, data: any) => {
@@ -248,14 +250,14 @@ describe('Crypto Payments API (e2e)', () => {
       .mockImplementation((chainId: number, txHash: string) => {
         const found = paymentsStore.find(
           (p) =>
-            p.chainId === chainId &&
-            p.transactionHash === txHash.toLowerCase(),
+            p.chainId === chainId && p.transactionHash === txHash.toLowerCase(),
         );
         return Promise.resolve(found ?? null);
       }),
     findVerifiedByOrder: jest.fn().mockImplementation((oId: string) => {
       const found = paymentsStore.find(
-        (p) => p.order.toString() === oId && p.verificationStatus === 'verified',
+        (p) =>
+          p.order.toString() === oId && p.verificationStatus === 'verified',
       );
       return Promise.resolve(found ?? null);
     }),
