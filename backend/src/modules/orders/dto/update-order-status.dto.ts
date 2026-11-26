@@ -1,10 +1,4 @@
-import {
-  IsIn,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ADMIN_SETTABLE_FULFILMENT_STATUSES } from '../constants/order.constants';
 import type { FulfilmentStatus } from '../constants/order.constants';
 

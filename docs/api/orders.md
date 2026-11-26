@@ -183,3 +183,59 @@ Orders in `"confirming"`, `"paid"`, `"processing"`, `"shipped"`, `"out_for_deliv
   - `401 Unauthorized`: Missing or invalid JWT token.
   - `404 Not Found`: Order does not exist or belongs to another user.
   - `409 Conflict`: Concurrent state change prevented cancellation.
+
+---
+
+## 4. Admin Order Management Endpoints
+
+All endpoints under `/api/v1/admin/orders` require JWT authentication (`JwtAuthGuard`) **and** `admin` role (`RolesGuard` + `@Roles('admin')`). Non-admin users receive `403 Forbidden`.
+
+### 4.1 List All Orders (Admin)
+- **Route:** `GET /api/v1/admin/orders`
+- **Auth:** Admin only
+- **Query Parameters (`AdminOrderQueryDto`):**
+  - `page` (optional, default `1`, min `1`)
+  - `limit` (optional, default `10`, min `1`, max `50`)
+  - `search` (optional): Case-insensitive partial match on `orderNumber` or `customerEmail`.
+  - `fulfilmentStatus` (optional): Filter by fulfilment status.
+  - `paymentStatus` (optional): Filter by payment status.
+- **Response `200 OK`:** Returns `{ "message": "Orders retrieved successfully", "data": FormattedOrder[], "meta": { page, limit, total, totalPages } }` with safe `customer` projection (`id`, `firstName`, `lastName`, `email`, `phone`, or `null` if user is unavailable).
+
+### 4.2 Get Order Details (Admin)
+- **Route:** `GET /api/v1/admin/orders/:orderId`
+- **Auth:** Admin only
+- **Response `200 OK`:** Returns `{ "message": "Order retrieved successfully", "data": FormattedOrder }` including `customer`, `items`, `shippingAddress`, tracking metadata (`shippingProvider`, `trackingNumber`, `trackingUrl`, `shippedAt`, `deliveredAt`), `paymentStatus`, and `statusHistory`.
+- **Error Responses:**
+  - `400 Bad Request`: Invalid `orderId` format.
+  - `401 Unauthorized` / `403 Forbidden`: Missing token or non-admin role.
+  - `404 Not Found`: Order not found.
+
+### 4.3 Update Fulfilment Status (Admin)
+- **Route:** `PATCH /api/v1/admin/orders/:orderId/status`
+- **Auth:** Admin only
+- **Request Body (`UpdateOrderStatusDto`):**
+```json
+{
+  "fulfilmentStatus": "shipped",
+  "shippingProvider": "FedEx",
+  "trackingNumber": "FX-999888",
+  "trackingUrl": "https://fedex.com/track/FX-999888",
+  "note": "Dispatched via air freight"
+}
+```
+- **Transition & Security Rules:**
+  - Admins cannot modify `paymentStatus` (managed exclusively by the Payments module).
+  - Forward-only transitions:
+    - `placed` → `cancelled` (only when `paymentStatus` is `pending` or `failed`; atomically releases `reservedStock`)
+    - `payment_confirmed` → `processing` (requires `paymentStatus: "paid"`)
+    - `processing` → `shipped` (requires `paymentStatus: "paid"`, `shippingProvider`, and `trackingNumber`)
+    - `shipped` → `out_for_delivery` | `delivered` (requires `paymentStatus: "paid"`)
+    - `out_for_delivery` → `delivered` (requires `paymentStatus: "paid"`)
+    - `delivered`, `cancelled` → terminal (no further transitions)
+  - Paid or confirming orders cannot be cancelled via this endpoint.
+  - Every transition appends `{ status, note, actor: "admin:<adminUserId>", changedAt }` to `statusHistory`.
+- **Error Responses:**
+  - `400 Bad Request`: Invalid transition, unpaid order, missing tracking info on `shipped`, or invalid `trackingUrl`.
+  - `401 Unauthorized` / `403 Forbidden`: Missing token or non-admin role.
+  - `404 Not Found`: Order not found.
+  - `409 Conflict`: Concurrent state change prevented atomic update.

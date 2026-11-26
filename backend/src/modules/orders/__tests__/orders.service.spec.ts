@@ -592,7 +592,9 @@ describe('OrdersService', () => {
       expect(res.fulfilmentStatus).toBe('shipped');
       expect(res.shippingProvider).toBe('FedEx');
       expect(res.trackingNumber).toBe('FX-999888');
-      expect(mockOrderRepository.updateAdminStatusAtomically).toHaveBeenCalledWith(
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).toHaveBeenCalledWith(
         orderId,
         expect.objectContaining({
           expectedCurrentStatus: 'processing',

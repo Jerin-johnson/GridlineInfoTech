@@ -149,32 +149,34 @@ describe('Admin Order Management API (e2e)', () => {
   const mockOrderRepository = {
     findAllForAdmin: jest
       .fn()
-      .mockImplementation((filter: any, options: { page: number; limit: number }) => {
-        let filtered = [...ordersStore];
-        if (filter.fulfilmentStatus) {
-          filtered = filtered.filter(
-            (o) => o.fulfilmentStatus === filter.fulfilmentStatus,
-          );
-        }
-        if (filter.paymentStatus) {
-          filtered = filtered.filter(
-            (o) => o.paymentStatus === filter.paymentStatus,
-          );
-        }
-        if (filter.search) {
-          const q = filter.search.toLowerCase();
-          filtered = filtered.filter(
-            (o) =>
-              o.orderNumber.toLowerCase().includes(q) ||
-              o.customerEmail.toLowerCase().includes(q),
-          );
-        }
-        const skip = (options.page - 1) * options.limit;
-        return Promise.resolve({
-          data: filtered.slice(skip, skip + options.limit),
-          total: filtered.length,
-        });
-      }),
+      .mockImplementation(
+        (filter: any, options: { page: number; limit: number }) => {
+          let filtered = [...ordersStore];
+          if (filter.fulfilmentStatus) {
+            filtered = filtered.filter(
+              (o) => o.fulfilmentStatus === filter.fulfilmentStatus,
+            );
+          }
+          if (filter.paymentStatus) {
+            filtered = filtered.filter(
+              (o) => o.paymentStatus === filter.paymentStatus,
+            );
+          }
+          if (filter.search) {
+            const q = filter.search.toLowerCase();
+            filtered = filtered.filter(
+              (o) =>
+                o.orderNumber.toLowerCase().includes(q) ||
+                o.customerEmail.toLowerCase().includes(q),
+            );
+          }
+          const skip = (options.page - 1) * options.limit;
+          return Promise.resolve({
+            data: filtered.slice(skip, skip + options.limit),
+            total: filtered.length,
+          });
+        },
+      ),
     findByIdForAdmin: jest.fn().mockImplementation((oId: string) => {
       const found = ordersStore.find((o) => o._id.toString() === oId);
       return Promise.resolve(found ?? null);
@@ -201,8 +203,10 @@ describe('Admin Order Management API (e2e)', () => {
           found.trackingUrl = data.trackingUrl;
         }
         if (data.shippedAt !== undefined) found.shippedAt = data.shippedAt;
-        if (data.deliveredAt !== undefined) found.deliveredAt = data.deliveredAt;
-        if (data.cancelledAt !== undefined) found.cancelledAt = data.cancelledAt;
+        if (data.deliveredAt !== undefined)
+          found.deliveredAt = data.deliveredAt;
+        if (data.cancelledAt !== undefined)
+          found.cancelledAt = data.cancelledAt;
         if (data.cancellationReason !== undefined) {
           found.cancellationReason = data.cancellationReason;
         }
