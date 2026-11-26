@@ -190,7 +190,9 @@ describe('Checkout & Orders API (e2e)', () => {
             o.idempotencyKey === data.idempotencyKey,
         )
       ) {
-        return Promise.reject({ code: 11000 });
+        return Promise.reject(
+          Object.assign(new Error('Duplicate key'), { code: 11000 }),
+        );
       }
       const doc = {
         _id: new Types.ObjectId(),
@@ -223,7 +225,11 @@ describe('Checkout & Orders API (e2e)', () => {
     findAllByUser: jest
       .fn()
       .mockImplementation(
-        (uId: string, filter: any, options: { page: number; limit: number }) => {
+        (
+          uId: string,
+          filter: any,
+          options: { page: number; limit: number },
+        ) => {
           let filtered = ordersStore.filter((o) => o.user.toString() === uId);
           if (filter.fulfilmentStatus) {
             filtered = filtered.filter(

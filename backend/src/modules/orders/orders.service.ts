@@ -10,7 +10,10 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { randomBytes, randomUUID } from 'crypto';
 import { ClientSession, Connection, Types } from 'mongoose';
 import { CartService } from '../cart/cart.service';
-import { ProductsService } from '../products/products.service';
+import {
+  FormattedProduct,
+  ProductsService,
+} from '../products/products.service';
 import { UsersService } from '../users/users.service';
 import {
   CANCELLABLE_FULFILMENT_STATUSES,
@@ -101,7 +104,7 @@ export class OrdersService {
         );
       }
 
-      let product;
+      let product: FormattedProduct;
       try {
         product = await this.productsService.findById(cartItem.productId);
       } catch {
@@ -383,7 +386,10 @@ export class OrdersService {
   private async executeWithOptionalTransaction<T>(
     work: (session?: ClientSession) => Promise<T>,
   ): Promise<T> {
-    if (!this.connection || typeof this.connection.startSession !== 'function') {
+    if (
+      !this.connection ||
+      typeof this.connection.startSession !== 'function'
+    ) {
       return work(undefined);
     }
 
