@@ -16,21 +16,26 @@ import {
 } from '../products/products.service';
 import { UsersService } from '../users/users.service';
 import {
+  ALLOWED_ADMIN_FULFILMENT_TRANSITIONS,
   CANCELLABLE_FULFILMENT_STATUSES,
   CANCELLABLE_PAYMENT_STATUSES,
   ORDER_REPOSITORY,
+  PAID_REQUIRED_FULFILMENT_STATUSES,
   PAYMENT_WINDOW_MINUTES,
 } from './constants/order.constants';
 import type {
   FulfilmentStatus,
   PaymentStatus,
 } from './constants/order.constants';
+import { AdminOrderQueryDto } from './dto/admin-order-query.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { CheckoutDto } from './dto/checkout.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import type { IOrderRepository } from './interfaces/order-repository.interface';
 import {
   FormattedOrder,
+  FormattedOrderCustomer,
   PaginatedOrdersResult,
 } from './interfaces/order.interface';
 import { Order, OrderDocument, OrderItem } from './schemas/order.schema';
@@ -419,6 +424,164 @@ export class OrdersService {
     return updated ? this.formatOrder(updated) : null;
   }
 
+  async findAllOrdersForAdmin(
+    query: AdminOrderQueryDto,
+  ): Promise<PaginatedOrdersResult> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const { data, total } = await this.orderRepository.findAllForAdmin(
+      {
+        search: query.search?.trim() || undefined,
+        fulfilmentStatus: query.fulfilmentStatus,
+        paymentStatus: query.paymentStatus,
+      },
+      { page, limit },
+    );
+
+    return {
+      data: data.map((order) => this.formatOrder(order, true)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOrderByIdForAdmin(orderId: string): Promise<FormattedOrder> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID format');
+    }
+
+    const order = await this.orderRepository.findByIdForAdmin(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return this.formatOrder(order, true);
+  }
+
+  async updateOrderStatusByAdmin(
+    orderId: string,
+    adminUserId: string,
+    dto: UpdateOrderStatusDto,
+  ): Promise<FormattedOrder> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID format');
+    }
+
+    const existing = await this.orderRepository.findByIdForAdmin(orderId);
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const allowedNext =
+      ALLOWED_ADMIN_FULFILMENT_TRANSITIONS[existing.fulfilmentStatus] ?? [];
+    if (!allowedNext.includes(dto.fulfilmentStatus)) {
+      throw new BadRequestException(
+        `Invalid fulfilment status transition from '${existing.fulfilmentStatus}' to '${dto.fulfilmentStatus}'`,
+      );
+    }
+
+    if (
+      PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus) &&
+      existing.paymentStatus !== 'paid'
+    ) {
+      throw new BadRequestException(
+        `Cannot transition unpaid order (paymentStatus: '${existing.paymentStatus}') to '${dto.fulfilmentStatus}'`,
+      );
+    }
+
+    if (
+      dto.fulfilmentStatus === 'cancelled' &&
+      !CANCELLABLE_PAYMENT_STATUSES.includes(existing.paymentStatus)
+    ) {
+      throw new BadRequestException(
+        `Paid or confirming orders (paymentStatus: '${existing.paymentStatus}') cannot be cancelled`,
+      );
+    }
+
+    const shippingProvider =
+      dto.shippingProvider?.trim() || existing.shippingProvider;
+    const trackingNumber =
+      dto.trackingNumber?.trim() || existing.trackingNumber;
+    const trackingUrl = dto.trackingUrl?.trim() || existing.trackingUrl;
+
+    if (
+      dto.fulfilmentStatus === 'shipped' &&
+      (!shippingProvider || !trackingNumber)
+    ) {
+      throw new BadRequestException(
+        'shippingProvider and trackingNumber are required when marking an order as shipped',
+      );
+    }
+
+    const now = new Date();
+    const note = dto.note?.trim() || undefined;
+    const historyNote = note
+      ? `Status updated to ${dto.fulfilmentStatus} by admin: ${note}`
+      : `Status updated to ${dto.fulfilmentStatus} by admin`;
+    const isCancelling = dto.fulfilmentStatus === 'cancelled';
+    const shouldReleaseStock = isCancelling && existing.stockReserved;
+
+    const updatedOrder = await this.executeWithOptionalTransaction(
+      async (session) => {
+        const updated = await this.orderRepository.updateAdminStatusAtomically(
+          orderId,
+          {
+            expectedCurrentStatus: existing.fulfilmentStatus,
+            allowedPaymentStatuses: isCancelling
+              ? CANCELLABLE_PAYMENT_STATUSES
+              : PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus)
+                ? ['paid']
+                : undefined,
+            fulfilmentStatus: dto.fulfilmentStatus,
+            shippingProvider,
+            trackingNumber,
+            trackingUrl,
+            ...(dto.fulfilmentStatus === 'shipped' ? { shippedAt: now } : {}),
+            ...(dto.fulfilmentStatus === 'delivered'
+              ? { deliveredAt: now }
+              : {}),
+            ...(isCancelling
+              ? {
+                  cancelledAt: now,
+                  cancellationReason: note || 'Cancelled by administrator',
+                  stockReserved: false,
+                }
+              : {}),
+            historyNote,
+            adminUserId,
+            changedAt: now,
+          },
+          session,
+        );
+
+        if (!updated) {
+          throw new ConflictException(
+            'Order state changed concurrently and could not be updated',
+          );
+        }
+
+        if (shouldReleaseStock) {
+          for (const item of existing.items) {
+            await this.productsService.releaseStock(
+              item.product.toString(),
+              item.quantity,
+              session,
+            );
+          }
+        }
+
+        return updated;
+      },
+    );
+
+    return this.formatOrder(updatedOrder, true);
+  }
+
   private async executeWithOptionalTransaction<T>(
     work: (session?: ClientSession) => Promise<T>,
   ): Promise<T> {
@@ -490,16 +653,53 @@ export class OrdersService {
     return `PAY-${randomUUID().replace(/-/g, '').toUpperCase()}`;
   }
 
-  private formatOrder(order: OrderDocument): FormattedOrder {
+  private formatOrder(
+    order: OrderDocument,
+    includeCustomer = false,
+  ): FormattedOrder {
     const raw = order.toObject
       ? (order.toObject() as unknown as Order & { _id: Types.ObjectId })
       : (order as unknown as Order & { _id: Types.ObjectId });
+
+    let customer: FormattedOrderCustomer | null | undefined;
+    if (includeCustomer) {
+      const userObj = raw.user as unknown as
+        | {
+            _id?: Types.ObjectId;
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            phone?: string;
+          }
+        | Types.ObjectId
+        | null
+        | undefined;
+
+      if (
+        userObj &&
+        typeof userObj === 'object' &&
+        'email' in userObj &&
+        typeof userObj.email === 'string' &&
+        userObj._id
+      ) {
+        customer = {
+          id: userObj._id.toString(),
+          firstName: userObj.firstName ?? '',
+          lastName: userObj.lastName ?? '',
+          email: userObj.email,
+          phone: userObj.phone,
+        };
+      } else {
+        customer = null;
+      }
+    }
 
     return {
       id: raw._id.toString(),
       orderNumber: raw.orderNumber,
       paymentReference: raw.paymentReference,
       customerEmail: raw.customerEmail,
+      ...(includeCustomer ? { customer } : {}),
       items: (raw.items || []).map((item) => ({
         productId: item.product.toString(),
         name: item.name,
@@ -540,6 +740,11 @@ export class OrdersService {
       paymentExpiresAt: raw.paymentExpiresAt,
       cancelledAt: raw.cancelledAt,
       cancellationReason: raw.cancellationReason,
+      shippingProvider: raw.shippingProvider,
+      trackingNumber: raw.trackingNumber,
+      trackingUrl: raw.trackingUrl,
+      shippedAt: raw.shippedAt,
+      deliveredAt: raw.deliveredAt,
       notes: raw.notes,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,

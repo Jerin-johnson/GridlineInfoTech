@@ -8,6 +8,7 @@ import { Order, OrderDocument } from '../schemas/order.schema';
 export interface OrderListFilter {
   fulfilmentStatus?: FulfilmentStatus;
   paymentStatus?: PaymentStatus;
+  search?: string;
 }
 
 export interface OrderListResult {
@@ -52,6 +53,31 @@ export interface IOrderRepository {
       historyStatus: string;
       historyNote: string;
       actor?: string;
+      changedAt: Date;
+    },
+    session?: ClientSession,
+  ): Promise<OrderDocument | null>;
+  findAllForAdmin(
+    filter: OrderListFilter,
+    options: { page: number; limit: number },
+  ): Promise<OrderListResult>;
+  findByIdForAdmin(orderId: string): Promise<OrderDocument | null>;
+  updateAdminStatusAtomically(
+    orderId: string,
+    data: {
+      expectedCurrentStatus: FulfilmentStatus;
+      allowedPaymentStatuses?: PaymentStatus[];
+      fulfilmentStatus: FulfilmentStatus;
+      shippingProvider?: string;
+      trackingNumber?: string;
+      trackingUrl?: string;
+      shippedAt?: Date;
+      deliveredAt?: Date;
+      cancelledAt?: Date;
+      cancellationReason?: string;
+      stockReserved?: boolean;
+      historyNote: string;
+      adminUserId: string;
       changedAt: Date;
     },
     session?: ClientSession,

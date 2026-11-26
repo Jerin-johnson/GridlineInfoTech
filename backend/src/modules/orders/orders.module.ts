@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CartModule } from '../cart/cart.module';
 import { ProductsModule } from '../products/products.module';
 import { UsersModule } from '../users/users.module';
+import { AdminOrdersController } from './admin-orders.controller';
 import { CheckoutController } from './checkout.controller';
 import { ORDER_REPOSITORY } from './constants/order.constants';
 import { OrdersController } from './orders.controller';
@@ -17,7 +18,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
     ProductsModule,
     UsersModule,
   ],
-  controllers: [CheckoutController, OrdersController],
+  controllers: [CheckoutController, OrdersController, AdminOrdersController],
   providers: [
     OrdersService,
     {
