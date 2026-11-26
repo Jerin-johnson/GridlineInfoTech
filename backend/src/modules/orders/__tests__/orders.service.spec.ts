@@ -20,6 +20,9 @@ describe('OrdersService', () => {
     findByIdempotencyKey: jest.Mock;
     findAllByUser: jest.Mock;
     cancelOrderAtomically: jest.Mock;
+    findAllForAdmin: jest.Mock;
+    findByIdForAdmin: jest.Mock;
+    updateAdminStatusAtomically: jest.Mock;
   };
   let mockCartService: {
     getCart: jest.Mock;
@@ -135,6 +138,9 @@ describe('OrdersService', () => {
       findByIdempotencyKey: jest.fn(),
       findAllByUser: jest.fn(),
       cancelOrderAtomically: jest.fn(),
+      findAllForAdmin: jest.fn(),
+      findByIdForAdmin: jest.fn(),
+      updateAdminStatusAtomically: jest.fn(),
     };
 
     mockCartService = {
@@ -464,6 +470,182 @@ describe('OrdersService', () => {
 
       await expect(service.cancelOrder(userId, orderId, {})).rejects.toThrow(
         ConflictException,
+      );
+    });
+  });
+
+  describe('Admin Order Management', () => {
+    const adminId = new Types.ObjectId().toString();
+
+    it('should list paginated orders for admin with safe customer projection', async () => {
+      mockOrderRepository.findAllForAdmin.mockResolvedValue({
+        data: [
+          makeMockOrderDoc({
+            user: {
+              _id: new Types.ObjectId(userId),
+              firstName: 'Alex',
+              lastName: 'Vance',
+              email: 'alex@gridline.com',
+              phone: '+1-555-0199',
+            },
+          }),
+        ],
+        total: 1,
+      });
+
+      const res = await service.findAllOrdersForAdmin({
+        page: 1,
+        limit: 10,
+        search: 'ORD-2026',
+      });
+
+      expect(res.data).toHaveLength(1);
+      expect(res.data[0].customer).toEqual({
+        id: userId,
+        firstName: 'Alex',
+        lastName: 'Vance',
+        email: 'alex@gridline.com',
+        phone: '+1-555-0199',
+      });
+    });
+
+    it('should return order for admin with customer: null when associated user is unavailable', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({ user: null }),
+      );
+
+      const res = await service.findOrderByIdForAdmin(orderId);
+      expect(res.id).toBe(orderId);
+      expect(res.customer).toBeNull();
+    });
+
+    it('should reject advancing an unpaid order to processing', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'payment_confirmed',
+          paymentStatus: 'pending',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'processing',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject invalid backward or skipped status transitions', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'processing',
+          paymentStatus: 'paid',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should require shippingProvider and trackingNumber when transitioning to shipped', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'processing',
+          paymentStatus: 'paid',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'shipped',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should transition processing -> shipped with tracking info and admin actor history', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'processing',
+          paymentStatus: 'paid',
+        }),
+      );
+      mockOrderRepository.updateAdminStatusAtomically.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'shipped',
+          paymentStatus: 'paid',
+          shippingProvider: 'FedEx',
+          trackingNumber: 'FX-999888',
+          trackingUrl: 'https://fedex.com/track/FX-999888',
+        }),
+      );
+
+      const res = await service.updateOrderStatusByAdmin(orderId, adminId, {
+        fulfilmentStatus: 'shipped',
+        shippingProvider: 'FedEx',
+        trackingNumber: 'FX-999888',
+        trackingUrl: 'https://fedex.com/track/FX-999888',
+        note: 'Dispatched via air freight',
+      });
+
+      expect(res.fulfilmentStatus).toBe('shipped');
+      expect(res.shippingProvider).toBe('FedEx');
+      expect(res.trackingNumber).toBe('FX-999888');
+      expect(mockOrderRepository.updateAdminStatusAtomically).toHaveBeenCalledWith(
+        orderId,
+        expect.objectContaining({
+          expectedCurrentStatus: 'processing',
+          fulfilmentStatus: 'shipped',
+          shippingProvider: 'FedEx',
+          trackingNumber: 'FX-999888',
+          adminUserId: adminId,
+        }),
+        undefined,
+      );
+    });
+
+    it('should reject cancelling a paid order through admin endpoint', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'placed',
+          paymentStatus: 'paid',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'cancelled',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should cancel eligible unpaid placed order and release reserved stock atomically', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'placed',
+          paymentStatus: 'pending',
+          stockReserved: true,
+        }),
+      );
+      mockOrderRepository.updateAdminStatusAtomically.mockResolvedValue(
+        makeMockOrderDoc({
+          fulfilmentStatus: 'cancelled',
+          paymentStatus: 'pending',
+          stockReserved: false,
+        }),
+      );
+
+      const res = await service.updateOrderStatusByAdmin(orderId, adminId, {
+        fulfilmentStatus: 'cancelled',
+        note: 'Customer requested via support',
+      });
+
+      expect(res.fulfilmentStatus).toBe('cancelled');
+      expect(mockProductsService.releaseStock).toHaveBeenCalledWith(
+        prodId1,
+        2,
+        undefined,
       );
     });
   });
