@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { CinematicFooter } from "@/components/landing/CinematicFooter";
 import { Navbar } from "@/components/landing/Navbar";
 import { CatalogueClient } from "@/components/shop/CatalogueClient";
 import { CatalogueSkeleton } from "@/components/shop/CatalogueSkeleton";
+import { ShopFooter } from "@/components/shop/ShopFooter";
 import {
   getBrands,
   getCategories,
@@ -151,16 +151,7 @@ async function ShopContent({
         hasError={hasError}
       />
 
-      <CinematicFooter
-        categories={categories.map((c) => ({
-          id: c._id,
-          name: c.name,
-          slug: c.slug,
-          description: c.description ?? "",
-          image: c.image ?? "",
-          productCount: 0,
-        }))}
-      />
+      <ShopFooter />
     </>
   );
 }

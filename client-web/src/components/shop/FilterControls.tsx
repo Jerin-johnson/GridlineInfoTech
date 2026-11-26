@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CatalogBrand } from "@/types/catalog.types";
 
 export interface FilterState {
@@ -28,6 +28,12 @@ export function FilterControls({
 }: FilterControlsProps) {
   const [minDraft, setMinDraft] = useState(filters.minPriceDollars);
   const [maxDraft, setMaxDraft] = useState(filters.maxPriceDollars);
+
+  // Keep price inputs synchronized on URL Back/Forward or Clear All
+  useEffect(() => {
+    setMinDraft(filters.minPriceDollars);
+    setMaxDraft(filters.maxPriceDollars);
+  }, [filters.minPriceDollars, filters.maxPriceDollars]);
 
   const handleApplyPrice = (e: React.FormEvent) => {
     e.preventDefault();

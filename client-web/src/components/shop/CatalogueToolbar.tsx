@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import type { CatalogSortOption } from "@/types/catalog.types";
 
@@ -24,10 +24,32 @@ export function CatalogueToolbar({
   onOpenMobileFilters,
 }: CatalogueToolbarProps) {
   const [searchDraft, setSearchDraft] = useState(searchQuery);
+  const lastSubmittedRef = useRef(searchQuery);
+
+  // Sync draft when URL changes via Back/Forward or Reset All
+  useEffect(() => {
+    setSearchDraft(searchQuery);
+    lastSubmittedRef.current = searchQuery;
+  }, [searchQuery]);
+
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const trimmed = searchDraft.trim();
+    if (trimmed === lastSubmittedRef.current) return;
+
+    const timer = setTimeout(() => {
+      lastSubmittedRef.current = trimmed;
+      onSearchSubmit(trimmed);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchDraft, onSearchSubmit]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearchSubmit(searchDraft.trim());
+    const trimmed = searchDraft.trim();
+    lastSubmittedRef.current = trimmed;
+    onSearchSubmit(trimmed);
   };
 
   return (
