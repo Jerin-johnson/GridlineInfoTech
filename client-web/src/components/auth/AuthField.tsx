@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { gsap } from "@/lib/gsap";
+import { prefersReducedMotion } from "./useAuthAnimations";
 
 interface AuthFieldProps {
   id: string;
@@ -15,7 +16,7 @@ interface AuthFieldProps {
   onChange: (value: string) => void;
   error?: string;
   disabled?: boolean;
-  onFocusChange?: (focused: boolean) => void;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function AuthField({
@@ -29,7 +30,7 @@ export function AuthField({
   onChange,
   error,
   disabled = false,
-  onFocusChange,
+  containerRef,
 }: AuthFieldProps) {
   const [showPassword, setShowPassword] = useState(false);
   const labelRef = useRef<HTMLLabelElement>(null);
@@ -42,15 +43,9 @@ export function AuthField({
       : "password"
     : type;
 
-  // Input focus animation: underline draws in + label eases up
+  // ANIMATION 3: Input focus — label floats up, 1px accent line draws L->R, border brightens softly
   const animateFocus = (focused: boolean) => {
-    onFocusChange?.(focused);
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
+    if (prefersReducedMotion()) return;
 
     if (underlineRef.current) {
       gsap.to(underlineRef.current, {
@@ -64,7 +59,7 @@ export function AuthField({
     if (labelRef.current) {
       gsap.to(labelRef.current, {
         y: focused ? -2 : 0,
-        color: focused ? "#F3F4F6" : "#C4C8D0",
+        color: focused ? "#F2F1ED" : "#A0A4AE",
         duration: 0.25,
         ease: "power3.out",
         overwrite: "auto",
@@ -73,16 +68,16 @@ export function AuthField({
   };
 
   return (
-    <div className="auth-field-item">
+    <div ref={containerRef} className="auth-stagger-item">
       <label
         ref={labelRef}
         htmlFor={id}
-        className="block text-sm font-medium text-[#C4C8D0] mb-2"
+        className="block text-sm font-medium text-[#A0A4AE] mb-1.5"
       >
         {label}
       </label>
 
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-[7px]">
         <input
           id={id}
           name={name}
@@ -96,20 +91,20 @@ export function AuthField({
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           placeholder={placeholder}
-          className={`h-14 w-full rounded-none bg-[#17191E] border px-4 text-base text-[#F3F4F6] placeholder:text-[#7F8592] transition-colors focus:outline-none focus:ring-1 disabled:opacity-50 ${
+          className={`h-[52px] w-full rounded-[7px] bg-[#1A1C22] border px-4 text-base text-[#F2F1ED] placeholder:text-[#5B606B] transition-colors duration-200 focus:outline-none focus:ring-2 disabled:opacity-50 ${
             isPasswordField ? "pr-12" : ""
           } ${
             error
-              ? "border-[#D13423] focus:border-[#D13423] focus:ring-[#D13423]/60"
-              : "border-[#2A2D35] focus:border-[#B8BDC7] focus:ring-[#B8BDC7]/40"
+              ? "border-[#B83227]/80 focus:border-[#B83227] focus:ring-[#B83227]/35"
+              : "border-white/[0.08] hover:border-white/[0.16] focus:border-[#B83227]/65 focus:ring-[#B83227]/30"
           }`}
         />
 
-        {/* Animated focus underline */}
+        {/* 1px accent underline drawing left-to-right on focus */}
         <span
           ref={underlineRef}
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px] origin-left scale-x-0 bg-[#D13423]"
+          className="pointer-events-none absolute bottom-0 left-0 right-0 h-[1.5px] origin-left scale-x-0 bg-[#B83227]"
         />
 
         {isPasswordField && (
@@ -118,7 +113,7 @@ export function AuthField({
             onClick={() => setShowPassword((prev) => !prev)}
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
-            className="absolute inset-y-0 right-0 px-4 flex items-center text-[#9CA3AF] hover:text-[#F3F4F6] transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-[#F3F4F6]"
+            className="absolute inset-y-0 right-0 px-3.5 flex items-center text-[#8B909C] hover:text-[#F2F1ED] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#B83227]"
           >
             {showPassword ? (
               <EyeOff className="w-4 h-4" />
@@ -130,7 +125,11 @@ export function AuthField({
       </div>
 
       {error && (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-[#F87171]">
+        <p
+          id={`${id}-error`}
+          aria-live="polite"
+          className="mt-1.5 text-xs text-[#F87171]"
+        >
           {error}
         </p>
       )}

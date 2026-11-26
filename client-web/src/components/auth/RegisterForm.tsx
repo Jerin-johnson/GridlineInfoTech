@@ -3,17 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Check, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import {
   getCurrentUser,
   getSafeRedirectPath,
   registerUser,
 } from "@/lib/api/auth.api";
 import { ApiError } from "@/lib/api/client";
-import { gsap } from "@/lib/gsap";
 import { AuthField } from "./AuthField";
-import { AuthShell } from "./AuthShell";
 import { GoogleAuthButton } from "./GoogleAuthButton";
+import { useAuthFormAnimations } from "./useAuthAnimations";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_COMPLEXITY_REGEX =
@@ -27,6 +26,46 @@ interface RegisterFieldErrors {
   confirmPassword?: string;
 }
 
+// ANIMATION 4: Password rule item with smooth color fade + SVG stroke-draw check mark
+function PasswordRuleItem({ met, label }: { met: boolean; label: string }) {
+  return (
+    <li
+      className={`flex items-center gap-1.5 text-xs transition-colors duration-300 ${
+        met ? "text-[#F2F1ED]" : "text-[#7A808D]"
+      }`}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+        className="shrink-0"
+      >
+        <circle
+          cx="8"
+          cy="8"
+          r="6.5"
+          className={`transition-colors duration-300 ${
+            met ? "stroke-emerald-400" : "stroke-white/15"
+          }`}
+          strokeWidth="1.2"
+        />
+        <path
+          d="M5 8.2L7 10.2L11.2 5.8"
+          className="stroke-emerald-400 transition-all duration-300 ease-out"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="12"
+          strokeDashoffset={met ? 0 : 12}
+        />
+      </svg>
+      <span>{label}</span>
+    </li>
+  );
+}
+
 export function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,19 +74,25 @@ export function RegisterForm() {
     ? `/login?redirect=${encodeURIComponent(redirectTarget)}`
     : "/login";
 
+  const { formScopeRef, shakeElement, fadeOutOnSuccess } =
+    useAuthFormAnimations();
   const formRef = useRef<HTMLFormElement>(null);
+  const firstNameRef = useRef<HTMLDivElement>(null);
+  const lastNameRef = useRef<HTMLDivElement>(null);
+  const emailRef = useRef<HTMLDivElement>(null);
+  const passwordRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -65,28 +110,6 @@ export function RegisterForm() {
     };
   }, [router, redirectTarget]);
 
-  const triggerErrorShake = () => {
-    if (
-      !formRef.current ||
-      (typeof window !== "undefined" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-    ) {
-      return;
-    }
-
-    gsap.fromTo(
-      formRef.current,
-      { x: -7 },
-      {
-        x: 0,
-        duration: 0.42,
-        ease: "power3.out",
-        keyframes: [{ x: -7 }, { x: 7 }, { x: -4 }, { x: 4 }, { x: 0 }],
-        clearProps: "transform",
-      },
-    );
-  };
-
   const hasMinLength = password.length >= 8 && password.length <= 64;
   const hasCaseMix = /[A-Z]/.test(password) && /[a-z]/.test(password);
   const hasNumberOrSpecial = /(\d|\W)/.test(password);
@@ -97,26 +120,26 @@ export function RegisterForm() {
     const errors: RegisterFieldErrors = {};
 
     if (!firstName.trim()) {
-      errors.firstName = "Enter your first name.";
+      errors.firstName = "Please enter your first name.";
     } else if (firstName.trim().length > 50) {
-      errors.firstName = "First name cannot exceed 50 characters.";
+      errors.firstName = "First name must be 50 characters or fewer.";
     }
 
     if (!lastName.trim()) {
-      errors.lastName = "Enter your last name.";
+      errors.lastName = "Please enter your last name.";
     } else if (lastName.trim().length > 50) {
-      errors.lastName = "Last name cannot exceed 50 characters.";
+      errors.lastName = "Last name must be 50 characters or fewer.";
     }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      errors.email = "Enter your email address.";
+      errors.email = "Please enter your email address.";
     } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      errors.email = "Enter a valid email address (for example, alex@domain.com).";
+      errors.email = "That doesn’t look like a valid email address.";
     }
 
     if (!password) {
-      errors.password = "Create a password.";
+      errors.password = "Please create a password.";
     } else if (password.length < 8 || password.length > 64) {
       errors.password = "Password must be between 8 and 64 characters.";
     } else if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
@@ -125,268 +148,253 @@ export function RegisterForm() {
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = "Confirm your password.";
+      errors.confirmPassword = "Please confirm your password.";
     } else if (password !== confirmPassword) {
-      errors.confirmPassword = "Passwords do not match.";
+      errors.confirmPassword = "Those passwords don’t match yet.";
     }
 
     setFieldErrors(errors);
+
+    if (errors.firstName) shakeElement(firstNameRef.current);
+    else if (errors.lastName) shakeElement(lastNameRef.current);
+    else if (errors.email) shakeElement(emailRef.current);
+    else if (errors.password) shakeElement(passwordRef.current);
+    else if (errors.confirmPassword) shakeElement(confirmRef.current);
+
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setServerError(null);
-    setSuccessMessage(null);
 
     if (!validate()) {
-      triggerErrorShake();
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const result = await registerUser({
+      await registerUser({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim().toLowerCase(),
         password,
       });
 
-      setSuccessMessage(`Account created for ${result.user.firstName}.`);
+      setIsSuccess(true);
       setTimeout(() => {
-        router.push(redirectTarget);
-        router.refresh();
-      }, 420);
+        fadeOutOnSuccess(() => {
+          router.push(redirectTarget);
+          router.refresh();
+        });
+      }, 320);
     } catch (err) {
-      triggerErrorShake();
+      shakeElement(formRef.current);
       if (err instanceof ApiError) {
         setServerError(err.message);
       } else {
-        setServerError("Unable to create account right now. Please try again.");
+        setServerError("Unable to create your account right now. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isSuccess = Boolean(successMessage);
-
   return (
-    <AuthShell
-      headline="Create your account"
-      supportingCopy="Save delivery addresses, track orders and check out faster."
-      posterImage="https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=1600&q=85"
-      posterAlt="Forged automotive performance hardware in dark studio"
-      isPasswordFocused={isPasswordFocused}
-      isSuccess={isSuccess}
-    >
-      <div className="space-y-5">
-        {serverError && (
-          <div
-            role="alert"
-            className="flex items-start gap-3 border border-[#D13423]/60 bg-[#D13423]/12 px-4 py-3.5 text-sm text-[#F3F4F6]"
-          >
-            <AlertCircle className="w-4 h-4 text-[#D13423] shrink-0 mt-0.5" />
-            <p className="leading-relaxed">{serverError}</p>
-          </div>
-        )}
+    <div ref={formScopeRef} className="space-y-4">
+      <div className="space-y-1.5">
+        <div className="overflow-hidden">
+          <h1 className="auth-heading-line font-serif text-3xl sm:text-4xl font-normal leading-tight text-[#F2F1ED]">
+            Create your account
+          </h1>
+        </div>
+        <p className="auth-stagger-item text-sm text-[#A0A4AE] leading-relaxed">
+          Save delivery addresses, track orders and check out faster.
+        </p>
+      </div>
 
-        {successMessage && (
-          <div
-            role="status"
-            className="flex items-start gap-3 border border-emerald-500/40 bg-emerald-500/10 px-4 py-3.5 text-sm text-[#F3F4F6]"
-          >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <p className="leading-relaxed">{successMessage}</p>
-          </div>
-        )}
-
-        <form
-          ref={formRef}
-          onSubmit={handleSubmit}
-          noValidate
-          className="space-y-4"
+      {serverError && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex items-start gap-2.5 rounded-[7px] border border-[#B83227]/45 bg-[#B83227]/10 px-4 py-3 text-sm text-[#F2F1ED]"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <AuthField
-              id="register-first-name"
-              name="firstName"
-              label="First name"
-              type="text"
-              autoComplete="given-name"
-              placeholder="Alex"
-              value={firstName}
-              onChange={(val) => {
-                setFirstName(val);
-                if (fieldErrors.firstName) {
-                  setFieldErrors((prev) => ({ ...prev, firstName: undefined }));
-                }
-              }}
-              error={fieldErrors.firstName}
-              disabled={isSubmitting || isSuccess}
-            />
+          <AlertCircle className="w-4 h-4 text-[#B83227] shrink-0 mt-0.5" />
+          <p className="leading-snug">{serverError}</p>
+        </div>
+      )}
 
-            <AuthField
-              id="register-last-name"
-              name="lastName"
-              label="Last name"
-              type="text"
-              autoComplete="family-name"
-              placeholder="Vance"
-              value={lastName}
-              onChange={(val) => {
-                setLastName(val);
-                if (fieldErrors.lastName) {
-                  setFieldErrors((prev) => ({ ...prev, lastName: undefined }));
-                }
-              }}
-              error={fieldErrors.lastName}
-              disabled={isSubmitting || isSuccess}
-            />
-          </div>
-
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-3"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <AuthField
-            id="register-email"
-            name="email"
-            label="Email address"
-            type="email"
-            autoComplete="email"
-            placeholder="alex@apexatelier.com"
-            value={email}
+            id="register-first-name"
+            name="firstName"
+            label="First name"
+            type="text"
+            autoComplete="given-name"
+            placeholder="Alex"
+            value={firstName}
+            containerRef={firstNameRef}
             onChange={(val) => {
-              setEmail(val);
-              if (fieldErrors.email) {
-                setFieldErrors((prev) => ({ ...prev, email: undefined }));
+              setFirstName(val);
+              if (fieldErrors.firstName) {
+                setFieldErrors((prev) => ({ ...prev, firstName: undefined }));
               }
             }}
-            error={fieldErrors.email}
+            error={fieldErrors.firstName}
             disabled={isSubmitting || isSuccess}
           />
 
           <AuthField
-            id="register-password"
-            name="password"
-            label="Password"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Minimum 8 characters"
-            value={password}
+            id="register-last-name"
+            name="lastName"
+            label="Last name"
+            type="text"
+            autoComplete="family-name"
+            placeholder="Vance"
+            value={lastName}
+            containerRef={lastNameRef}
             onChange={(val) => {
-              setPassword(val);
-              if (fieldErrors.password) {
-                setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              setLastName(val);
+              if (fieldErrors.lastName) {
+                setFieldErrors((prev) => ({ ...prev, lastName: undefined }));
               }
             }}
-            onFocusChange={setIsPasswordFocused}
-            error={fieldErrors.password}
+            error={fieldErrors.lastName}
             disabled={isSubmitting || isSuccess}
           />
+        </div>
 
-          <AuthField
-            id="register-confirm-password"
-            name="confirmPassword"
-            label="Confirm password"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Re-enter your password"
-            value={confirmPassword}
-            onChange={(val) => {
-              setConfirmPassword(val);
-              if (fieldErrors.confirmPassword) {
-                setFieldErrors((prev) => ({
-                  ...prev,
-                  confirmPassword: undefined,
-                }));
-              }
-            }}
-            onFocusChange={setIsPasswordFocused}
-            error={fieldErrors.confirmPassword}
-            disabled={isSubmitting || isSuccess}
-          />
-
-          <ul className="auth-field-item grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 text-xs text-[#9CA3AF]">
-            <li
-              className={`flex items-center gap-1.5 transition-colors ${
-                hasMinLength ? "text-emerald-400" : ""
-              }`}
-            >
-              <Check className="w-3.5 h-3.5 shrink-0" />
-              <span>8–64 characters</span>
-            </li>
-            <li
-              className={`flex items-center gap-1.5 transition-colors ${
-                hasCaseMix ? "text-emerald-400" : ""
-              }`}
-            >
-              <Check className="w-3.5 h-3.5 shrink-0" />
-              <span>Upper &amp; lowercase</span>
-            </li>
-            <li
-              className={`flex items-center gap-1.5 transition-colors ${
-                hasNumberOrSpecial ? "text-emerald-400" : ""
-              }`}
-            >
-              <Check className="w-3.5 h-3.5 shrink-0" />
-              <span>Number or symbol</span>
-            </li>
-            <li
-              className={`flex items-center gap-1.5 transition-colors ${
-                passwordsMatch ? "text-emerald-400" : ""
-              }`}
-            >
-              <Check className="w-3.5 h-3.5 shrink-0" />
-              <span>Passwords match</span>
-            </li>
-          </ul>
-
-          <div className="auth-field-item pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting || isSuccess}
-              className="group relative h-14 w-full overflow-hidden rounded-none bg-[#F3F4F6] text-[#0A0B0E] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.985] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-2"
-            >
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 -translate-x-full bg-[#D13423] transition-transform duration-300 ease-out group-hover:translate-x-0"
-              />
-              <span className="relative z-10 flex items-center justify-center gap-2.5 transition-colors duration-300 group-hover:text-[#F3F4F6]">
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>
-                  {isSubmitting ? "Creating account..." : "Create account"}
-                </span>
-              </span>
-            </button>
-          </div>
-        </form>
-
-        <GoogleAuthButton
-          mode="register"
+        <AuthField
+          id="register-email"
+          name="email"
+          label="Email address"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          containerRef={emailRef}
+          onChange={(val) => {
+            setEmail(val);
+            if (fieldErrors.email) {
+              setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }
+          }}
+          error={fieldErrors.email}
           disabled={isSubmitting || isSuccess}
-          onSuccess={(user) => {
-            setServerError(null);
-            setSuccessMessage(`Account ready, ${user.firstName}.`);
-            setTimeout(() => {
-              router.push(redirectTarget);
-              router.refresh();
-            }, 420);
-          }}
-          onError={(msg) => {
-            triggerErrorShake();
-            setServerError(msg);
-          }}
         />
 
-        <div className="auth-field-item pt-5 border-t border-white/10 flex items-center justify-between text-sm text-[#C4C8D0]">
-          <span>Already have an account?</span>
-          <Link
-            href={loginHref}
-            className="font-medium text-[#F3F4F6] hover:text-[#D13423] transition-colors underline underline-offset-4 decoration-white/25 hover:decoration-[#D13423]"
+        <AuthField
+          id="register-password"
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          value={password}
+          containerRef={passwordRef}
+          onChange={(val) => {
+            setPassword(val);
+            if (fieldErrors.password) {
+              setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            }
+          }}
+          error={fieldErrors.password}
+          disabled={isSubmitting || isSuccess}
+        />
+
+        {/* Compact password checklist directly below password */}
+        <ul className="auth-stagger-item grid grid-cols-2 gap-x-4 gap-y-1.5 px-0.5 py-0.5">
+          <PasswordRuleItem met={hasMinLength} label="8–64 characters" />
+          <PasswordRuleItem met={hasCaseMix} label="Upper & lowercase" />
+          <PasswordRuleItem met={hasNumberOrSpecial} label="Number or symbol" />
+          <PasswordRuleItem met={passwordsMatch} label="Passwords match" />
+        </ul>
+
+        <AuthField
+          id="register-confirm-password"
+          name="confirmPassword"
+          label="Confirm password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          containerRef={confirmRef}
+          onChange={(val) => {
+            setConfirmPassword(val);
+            if (fieldErrors.confirmPassword) {
+              setFieldErrors((prev) => ({
+                ...prev,
+                confirmPassword: undefined,
+              }));
+            }
+          }}
+          error={fieldErrors.confirmPassword}
+          disabled={isSubmitting || isSuccess}
+        />
+
+        <div className="auth-stagger-item pt-1">
+          <button
+            type="submit"
+            disabled={isSubmitting || isSuccess}
+            className="group relative h-[52px] w-full overflow-hidden rounded-[7px] bg-[#F2F1ED] text-[#0E0F12] px-6 text-sm font-medium transition-transform duration-150 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-[#B83227] focus-visible:outline-offset-2"
           >
-            Sign in
-          </Link>
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 -translate-x-full bg-[#B83227] transition-transform duration-300 ease-out group-hover:translate-x-0"
+            />
+            <span className="relative z-10 flex items-center justify-center gap-2 transition-colors duration-300 group-hover:text-[#F2F1ED]">
+              {isSuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600 group-hover:text-[#F2F1ED] transition-transform duration-200 scale-110" />
+                  <span>Account created</span>
+                </>
+              ) : isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Creating account...</span>
+                </>
+              ) : (
+                <span>Create account</span>
+              )}
+            </span>
+          </button>
         </div>
+      </form>
+
+      <GoogleAuthButton
+        mode="register"
+        disabled={isSubmitting || isSuccess}
+        onSuccess={() => {
+          setServerError(null);
+          setIsSuccess(true);
+          setTimeout(() => {
+            fadeOutOnSuccess(() => {
+              router.push(redirectTarget);
+              router.refresh();
+            });
+          }, 320);
+        }}
+        onError={(msg) => {
+          shakeElement(formRef.current);
+          setServerError(msg);
+        }}
+      />
+
+      <div className="auth-stagger-item pt-3 border-t border-white/[0.08] flex items-center justify-between text-sm text-[#A0A4AE]">
+        <span>Already have an account?</span>
+        <Link
+          href={loginHref}
+          className="font-medium text-[#F2F1ED] hover:text-[#B83227] transition-colors"
+        >
+          Sign in
+        </Link>
       </div>
-    </AuthShell>
+    </div>
   );
 }

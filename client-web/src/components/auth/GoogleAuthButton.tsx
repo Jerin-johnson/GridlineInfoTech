@@ -116,7 +116,7 @@ export function GoogleAuthButton({
   }
 
   return (
-    <div className="space-y-5 pt-2">
+    <div className="auth-stagger-item space-y-4 pt-1">
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
@@ -124,22 +124,22 @@ export function GoogleAuthButton({
       />
 
       <div className="relative flex items-center justify-center">
-        <span className="h-[1px] w-full bg-white/10" />
-        <span className="bg-[#0D0D0F] px-3 text-[10px] tracking-[0.24em] uppercase text-zinc-500 whitespace-nowrap">
-          Or Continue With
+        <span className="h-[1px] w-full bg-white/[0.08]" />
+        <span className="bg-[#14161A] px-3 text-xs text-[#8B909C] whitespace-nowrap">
+          or
         </span>
-        <span className="h-[1px] w-full bg-white/10" />
+        <span className="h-[1px] w-full bg-white/[0.08]" />
       </div>
 
       <div
-        className={`relative min-h-[44px] flex items-center justify-center border border-white/15 bg-[#141417]/60 transition-opacity ${
+        className={`relative min-h-[44px] flex items-center justify-center rounded-[7px] border border-white/[0.08] bg-[#1A1C22] overflow-hidden transition-opacity ${
           disabled || isSubmitting ? "opacity-50 pointer-events-none" : ""
         }`}
       >
         <div ref={buttonRef} className="w-full flex justify-center" />
         {!scriptLoaded && (
-          <span className="text-[11px] tracking-[0.2em] uppercase text-zinc-400">
-            Loading Google Sign-In...
+          <span className="text-xs text-[#A0A4AE]">
+            Loading Google sign-in...
           </span>
         )}
       </div>

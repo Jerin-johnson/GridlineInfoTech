@@ -1,214 +1,95 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
-import { gsap } from "@/lib/gsap";
-import { AuthHeroStage } from "./AuthHeroStage";
+import Image from "next/image";
+import { ArrowLeft, Lock } from "lucide-react";
+import { useAuthShellAnimations } from "./useAuthAnimations";
 
-interface AuthShellProps {
-  headline: string;
-  supportingCopy: string;
-  posterImage: string;
-  posterAlt: string;
-  isPasswordFocused: boolean;
-  isSuccess: boolean;
-  children: React.ReactNode;
-}
+const HERO_PHOTO =
+  "https://images.unsplash.com/photo-1611821064430-0d40291d0f0b?auto=format&fit=crop&w=1600&q=85";
 
-export function AuthShell({
-  headline,
-  supportingCopy,
-  posterImage,
-  posterAlt,
-  isPasswordFocused,
-  isSuccess,
-  children,
-}: AuthShellProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Orchestrated 1.2s load timeline: masked headline -> accent rule -> staggered form fields
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
-
-      tl.from(".auth-headline-line", {
-        yPercent: 100,
-        opacity: 0,
-        duration: 0.75,
-        clearProps: "transform,opacity",
-      })
-        .from(
-          ".auth-accent-line",
-          {
-            scaleX: 0,
-            duration: 0.45,
-            ease: "power3.out",
-            clearProps: "transform",
-          },
-          "-=0.45",
-        )
-        .from(
-          ".auth-field-item",
-          {
-            y: 12,
-            opacity: 0,
-            duration: 0.45,
-            stagger: 0.06,
-            ease: "power3.out",
-            clearProps: "transform,opacity",
-          },
-          "-=0.25",
-        );
-    }, root);
-
-    return () => ctx.revert();
-  }, []);
+export function AuthShell({ children }: { children: React.ReactNode }) {
+  const { shellRef, photoWrapRef, photoImgRef } = useAuthShellAnimations();
 
   return (
     <div
-      ref={rootRef}
-      className="relative min-h-screen bg-[#0A0B0E] text-[#F3F4F6] grid grid-cols-1 lg:grid-cols-12"
+      ref={shellRef}
+      className="min-h-screen bg-[#0E0F12] text-[#F2F1ED] flex flex-col lg:grid lg:grid-cols-12"
     >
-      {/* Left 60% Three.js Showroom Stage (Desktop) */}
-      <aside className="hidden lg:flex lg:col-span-7 relative flex-col justify-between overflow-hidden bg-[#0A0B0E] p-10 xl:p-14">
-        <AuthHeroStage
-          posterImage={posterImage}
-          posterAlt={posterAlt}
-          isPasswordFocused={isPasswordFocused}
-          isSuccess={isSuccess}
-        />
-
-        {/* Top Bar (Single ALL-CAPS brand mark on the page) */}
-        <div className="relative z-30 flex items-center justify-between">
-          <Link
-            href="/"
-            aria-label="APEX ATELIER Home"
-            className="flex items-center gap-3 group focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-4"
-          >
-            <svg
-              width="26"
-              height="20"
-              viewBox="0 0 28 22"
-              fill="none"
-              className="text-[#F3F4F6] transition-transform duration-300 group-hover:scale-105"
-            >
-              <path
-                d="M14 2L26 20H20.5L14 10L7.5 20H2L14 2Z"
-                fill="currentColor"
-              />
-              <path d="M14 14L18 20H10L14 14Z" fill="#D13423" />
-            </svg>
-            <span className="text-xs font-medium tracking-[0.28em] uppercase text-[#F3F4F6]">
-              APEX ATELIER
-            </span>
-          </Link>
-
-          <Link
-            href="/shop"
-            className="inline-flex items-center gap-2 text-sm text-[#C4C8D0] hover:text-[#F3F4F6] transition-colors focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to catalogue</span>
-          </Link>
+      {/* Left Photo Panel: Full-bleed on desktop, short header strip on mobile */}
+      <aside className="relative h-44 sm:h-52 lg:h-screen lg:sticky lg:top-0 lg:col-span-6 overflow-hidden bg-[#0E0F12]">
+        <div
+          ref={photoWrapRef}
+          className="absolute inset-0 overflow-hidden"
+        >
+          <div ref={photoImgRef} className="absolute inset-0 will-change-transform">
+            <Image
+              src={HERO_PHOTO}
+              alt="Forged performance wheel and brake hardware"
+              fill
+              priority
+              quality={85}
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover object-center opacity-75"
+            />
+          </div>
+          {/* Soft dark gradient overlay for calm readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0E0F12] via-[#0E0F12]/45 to-[#0E0F12]/70" />
         </div>
 
-        {/* Bottom Trust Strip */}
-        <div className="relative z-30 flex items-center justify-between pt-6 border-t border-white/10 text-sm text-[#C4C8D0]">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-[#D13423]" />
-            <span>Your session is encrypted</span>
+        {/* Overlay content: single ALL-CAPS brand mark, short headline, one trust line */}
+        <div className="relative z-10 h-full flex flex-col justify-between p-6 sm:p-8 lg:p-12">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              aria-label="APEX ATELIER Home"
+              className="inline-flex items-center gap-2.5 text-[#F2F1ED] focus-visible:outline-2 focus-visible:outline-[#F2F1ED] focus-visible:outline-offset-4"
+            >
+              <svg
+                width="24"
+                height="18"
+                viewBox="0 0 28 22"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M14 2L26 20H20.5L14 10L7.5 20H2L14 2Z"
+                  fill="currentColor"
+                />
+                <path d="M14 14L18 20H10L14 14Z" fill="#B83227" />
+              </svg>
+              <span className="text-xs font-medium tracking-[0.24em] uppercase">
+                APEX ATELIER
+              </span>
+            </Link>
+
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-1.5 text-sm text-[#D1D5DB] hover:text-[#F2F1ED] transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Catalogue</span>
+            </Link>
           </div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#B8BDC7]" />
-            <span>Secure checkout</span>
+
+          <div className="hidden lg:block space-y-4 max-w-md">
+            <h2 className="font-serif text-4xl font-normal leading-[1.12] text-[#F2F1ED]">
+              Precision hardware for drivers who notice every gram.
+            </h2>
+            <p className="inline-flex items-center gap-2 text-sm text-[#A0A4AE]">
+              <Lock className="w-4 h-4 text-[#B83227]" />
+              <span>Your session is encrypted</span>
+            </p>
           </div>
         </div>
       </aside>
 
-      {/* Right 40% Auth Panel */}
-      <main className="lg:col-span-5 flex flex-col justify-between min-h-screen bg-[#111216] border-l border-white/10 px-6 py-8 sm:px-10 xl:px-14">
-        {/* Mobile Header (< 1024px) */}
-        <header className="flex lg:hidden items-center justify-between pb-6 border-b border-white/10">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-[#F3F4F6] focus-visible:outline-offset-4"
-          >
-            <svg
-              width="22"
-              height="17"
-              viewBox="0 0 28 22"
-              fill="none"
-              className="text-[#F3F4F6]"
-            >
-              <path
-                d="M14 2L26 20H20.5L14 10L7.5 20H2L14 2Z"
-                fill="currentColor"
-              />
-              <path d="M14 14L18 20H10L14 14Z" fill="#D13423" />
-            </svg>
-            <span className="text-xs font-medium tracking-[0.26em] uppercase text-[#F3F4F6]">
-              APEX ATELIER
-            </span>
-          </Link>
-
-          <Link
-            href="/shop"
-            className="inline-flex items-center gap-1.5 text-sm text-[#C4C8D0] hover:text-[#F3F4F6] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Catalogue</span>
-          </Link>
-        </header>
-
-        {/* Full-Presence Form Column */}
-        <div className="flex-1 flex flex-col justify-center py-8 sm:py-10 w-full max-w-[440px] mx-auto">
-          <div className="mb-8 space-y-3">
-            <div className="overflow-hidden">
-              <h1 className="auth-headline-line font-serif text-4xl sm:text-[44px] font-normal leading-[1.08] tracking-tight text-[#F3F4F6]">
-                {headline}
-              </h1>
-            </div>
-
-            <div className="auth-accent-line h-[2px] w-12 origin-left bg-[#D13423]" />
-
-            <p className="auth-field-item text-[15px] text-[#C4C8D0] leading-relaxed">
-              {supportingCopy}
-            </p>
-          </div>
-
+      {/* Right Form Panel: Fits 768px+ comfortably without top clipping */}
+      <main className="flex-1 lg:col-span-6 lg:min-h-screen bg-[#14161A] lg:border-l lg:border-white/[0.08] flex flex-col px-6 py-6 sm:px-10 lg:px-14 overflow-y-auto">
+        <div className="my-auto w-full max-w-[420px] mx-auto py-2">
           {children}
         </div>
-
-        {/* Footer Trust Line */}
-        <footer className="pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-[#9CA3AF]">
-          <span>Your session is encrypted</span>
-          <Link
-            href="/shop"
-            className="text-[#C4C8D0] hover:text-[#F3F4F6] transition-colors"
-          >
-            Browse hardware without signing in
-          </Link>
-        </footer>
       </main>
-
-      {/* Success Wipe Overlay when camera pushes through */}
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none fixed inset-0 z-50 bg-[#0A0B0E] transition-opacity duration-500 ${
-          isSuccess ? "opacity-90" : "opacity-0"
-        }`}
-      />
     </div>
   );
 }

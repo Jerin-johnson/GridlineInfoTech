@@ -12,7 +12,7 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0A0B0E] flex items-center justify-center text-sm text-[#C4C8D0]">
+        <div className="py-12 text-center text-sm text-[#A0A4AE]">
           Loading...
         </div>
       }
