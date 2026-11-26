@@ -165,6 +165,21 @@ export class Order {
   cancellationReason?: string;
 
   @Prop({ trim: true })
+  shippingProvider?: string;
+
+  @Prop({ trim: true })
+  trackingNumber?: string;
+
+  @Prop({ trim: true })
+  trackingUrl?: string;
+
+  @Prop()
+  shippedAt?: Date;
+
+  @Prop()
+  deliveredAt?: Date;
+
+  @Prop({ trim: true })
   notes?: string;
 
   createdAt?: Date;

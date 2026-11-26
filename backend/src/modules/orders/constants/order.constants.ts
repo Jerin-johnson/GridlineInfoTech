@@ -31,3 +31,31 @@ export const CANCELLABLE_PAYMENT_STATUSES: PaymentStatus[] = [
 ];
 
 export const PAYMENT_WINDOW_MINUTES = 30;
+
+export const ADMIN_SETTABLE_FULFILMENT_STATUSES = [
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+  'cancelled',
+] as const;
+
+export const PAID_REQUIRED_FULFILMENT_STATUSES: FulfilmentStatus[] = [
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+];
+
+export const ALLOWED_ADMIN_FULFILMENT_TRANSITIONS: Record<
+  FulfilmentStatus,
+  FulfilmentStatus[]
+> = {
+  placed: ['cancelled'],
+  payment_confirmed: ['processing'],
+  processing: ['shipped'],
+  shipped: ['out_for_delivery', 'delivered'],
+  out_for_delivery: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};

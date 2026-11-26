@@ -34,11 +34,20 @@ export interface FormattedOrderStatusHistoryEntry {
   changedAt: Date;
 }
 
+export interface FormattedOrderCustomer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+}
+
 export interface FormattedOrder {
   id: string;
   orderNumber: string;
   paymentReference: string;
   customerEmail: string;
+  customer?: FormattedOrderCustomer | null;
   items: FormattedOrderItem[];
   shippingAddress: FormattedOrderShippingAddress;
   subtotal: number;
@@ -54,6 +63,11 @@ export interface FormattedOrder {
   paymentExpiresAt: Date;
   cancelledAt?: Date;
   cancellationReason?: string;
+  shippingProvider?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  shippedAt?: Date;
+  deliveredAt?: Date;
   notes?: string;
   createdAt?: Date;
   updatedAt?: Date;

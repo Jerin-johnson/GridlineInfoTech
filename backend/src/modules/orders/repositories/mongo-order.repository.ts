@@ -175,4 +175,127 @@ export class MongoOrderRepository implements IOrderRepository {
       )
       .exec();
   }
+
+  async findAllForAdmin(
+    filter: OrderListFilter,
+    options: { page: number; limit: number },
+  ): Promise<OrderListResult> {
+    const query: FilterQuery<OrderDocument> = {};
+
+    if (filter.fulfilmentStatus) {
+      query.fulfilmentStatus = filter.fulfilmentStatus;
+    }
+
+    if (filter.paymentStatus) {
+      query.paymentStatus = filter.paymentStatus;
+    }
+
+    if (filter.search) {
+      const escaped = filter.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      query.$or = [{ orderNumber: regex }, { customerEmail: regex }];
+    }
+
+    const skip = (options.page - 1) * options.limit;
+
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find(query)
+        .populate('user', 'firstName lastName email phone')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(options.limit)
+        .exec(),
+      this.orderModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  async findByIdForAdmin(orderId: string): Promise<OrderDocument | null> {
+    return this.orderModel
+      .findById(orderId)
+      .populate('user', 'firstName lastName email phone')
+      .exec();
+  }
+
+  async updateAdminStatusAtomically(
+    orderId: string,
+    data: {
+      expectedCurrentStatus: FulfilmentStatus;
+      allowedPaymentStatuses?: PaymentStatus[];
+      fulfilmentStatus: FulfilmentStatus;
+      shippingProvider?: string;
+      trackingNumber?: string;
+      trackingUrl?: string;
+      shippedAt?: Date;
+      deliveredAt?: Date;
+      cancelledAt?: Date;
+      cancellationReason?: string;
+      stockReserved?: boolean;
+      historyNote: string;
+      adminUserId: string;
+      changedAt: Date;
+    },
+    session?: ClientSession,
+  ): Promise<OrderDocument | null> {
+    const filter: FilterQuery<OrderDocument> = {
+      _id: new Types.ObjectId(orderId),
+      fulfilmentStatus: data.expectedCurrentStatus,
+    };
+
+    if (data.allowedPaymentStatuses) {
+      filter.paymentStatus = { $in: data.allowedPaymentStatuses };
+    }
+
+    const setFields: Record<string, unknown> = {
+      fulfilmentStatus: data.fulfilmentStatus,
+    };
+
+    if (data.shippingProvider !== undefined) {
+      setFields.shippingProvider = data.shippingProvider;
+    }
+    if (data.trackingNumber !== undefined) {
+      setFields.trackingNumber = data.trackingNumber;
+    }
+    if (data.trackingUrl !== undefined) {
+      setFields.trackingUrl = data.trackingUrl;
+    }
+    if (data.shippedAt !== undefined) {
+      setFields.shippedAt = data.shippedAt;
+    }
+    if (data.deliveredAt !== undefined) {
+      setFields.deliveredAt = data.deliveredAt;
+    }
+    if (data.cancelledAt !== undefined) {
+      setFields.cancelledAt = data.cancelledAt;
+    }
+    if (data.cancellationReason !== undefined) {
+      setFields.cancellationReason = data.cancellationReason;
+    }
+    if (data.stockReserved !== undefined) {
+      setFields.stockReserved = data.stockReserved;
+    }
+
+    return this.orderModel
+      .findOneAndUpdate(
+        filter,
+        {
+          $set: setFields,
+          $push: {
+            statusHistory: {
+              status: data.fulfilmentStatus,
+              note: data.historyNote,
+              actor: `admin:${data.adminUserId}`,
+              changedAt: data.changedAt,
+            },
+          },
+        },
+        { new: true, session },
+      )
+      .populate('user', 'firstName lastName email phone')
+      .exec();
+  }
 }
