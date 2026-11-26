@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getLandingPageData } from "@/lib/api/store-front.api";
 import { Navbar } from "@/components/landing/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
@@ -10,7 +11,7 @@ import { CinematicInterlude } from "@/components/landing/CinematicInterlude";
 import { FeaturedCatalogue } from "@/components/landing/FeaturedCatalogue";
 import { CinematicFooter } from "@/components/landing/CinematicFooter";
 
-export default async function HomePage() {
+async function HomeContent() {
   const { brands, categories, featuredProducts } = await getLandingPageData();
 
   return (
@@ -26,5 +27,13 @@ export default async function HomePage() {
       <FeaturedCatalogue products={featuredProducts} />
       <CinematicFooter categories={categories} />
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#080808]" />}>
+      <HomeContent />
+    </Suspense>
   );
 }
