@@ -32,6 +32,7 @@ describe('OrdersService', () => {
     findById: jest.Mock;
     reserveStock: jest.Mock;
     releaseStock: jest.Mock;
+    confirmStockDeduction: jest.Mock;
   };
   let mockUsersService: {
     getProfile: jest.Mock;
@@ -152,6 +153,7 @@ describe('OrdersService', () => {
       findById: jest.fn(),
       reserveStock: jest.fn().mockResolvedValue(true),
       releaseStock: jest.fn().mockResolvedValue(true),
+      confirmStockDeduction: jest.fn().mockResolvedValue(true),
     };
 
     mockUsersService = {
@@ -649,6 +651,190 @@ describe('OrdersService', () => {
         2,
         undefined,
       );
+    });
+
+    it('should mark COD order delivered and paid, finalize inventory, and record paidAt when codPaymentReceived is true', async () => {
+      const paidAt = new Date();
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+          stockReserved: true,
+          totalAmount: 70000,
+        }),
+      );
+      mockProductsService.confirmStockDeduction.mockResolvedValue(true);
+      mockOrderRepository.updateAdminStatusAtomically.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'paid',
+          fulfilmentStatus: 'delivered',
+          stockReserved: false,
+          paidAt,
+          deliveredAt: paidAt,
+        }),
+      );
+
+      const res = await service.updateOrderStatusByAdmin(orderId, adminId, {
+        fulfilmentStatus: 'delivered',
+        codPaymentReceived: true,
+        note: 'Collected cash at doorstep',
+      });
+
+      expect(res.fulfilmentStatus).toBe('delivered');
+      expect(res.paymentStatus).toBe('paid');
+      expect(res.paidAt).toBe(paidAt);
+      expect(res.stockReserved).toBe(false);
+      expect(mockProductsService.confirmStockDeduction).toHaveBeenCalledWith(
+        prodId1,
+        2,
+        undefined,
+      );
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).toHaveBeenCalledWith(
+        orderId,
+        expect.objectContaining({
+          expectedCurrentStatus: 'out_for_delivery',
+          allowedPaymentStatuses: ['pending', 'failed'],
+          fulfilmentStatus: 'delivered',
+          paymentStatus: 'paid',
+          codPaymentConfirmedBy: adminId,
+          stockReserved: false,
+        }),
+        undefined,
+      );
+    });
+
+    it('should reject COD delivery when codPaymentReceived is false without modifying order, payment, or inventory', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+          stockReserved: true,
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+          codPaymentReceived: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).not.toHaveBeenCalled();
+      expect(mockProductsService.confirmStockDeduction).not.toHaveBeenCalled();
+    });
+
+    it('should reject COD delivery when codPaymentReceived is missing without modifying order, payment, or inventory', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+          stockReserved: true,
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).not.toHaveBeenCalled();
+      expect(mockProductsService.confirmStockDeduction).not.toHaveBeenCalled();
+    });
+
+    it('should reject COD unpaid order jumping directly from placed or processing to delivered', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'placed',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+          codPaymentReceived: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should reject codPaymentReceived on crypto_wallet orders', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'crypto_wallet',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+        }),
+      );
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+          codPaymentReceived: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException if stock finalization fails during COD delivery confirmation', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+          stockReserved: true,
+        }),
+      );
+      mockProductsService.confirmStockDeduction.mockResolvedValue(false);
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+          codPaymentReceived: true,
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(
+        mockOrderRepository.updateAdminStatusAtomically,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should handle duplicate or concurrent COD payment confirmation safely with ConflictException', async () => {
+      mockOrderRepository.findByIdForAdmin.mockResolvedValue(
+        makeMockOrderDoc({
+          paymentMethod: 'cod',
+          paymentStatus: 'pending',
+          fulfilmentStatus: 'out_for_delivery',
+          stockReserved: true,
+        }),
+      );
+      mockProductsService.confirmStockDeduction.mockResolvedValue(true);
+      mockOrderRepository.updateAdminStatusAtomically.mockResolvedValue(null);
+
+      await expect(
+        service.updateOrderStatusByAdmin(orderId, adminId, {
+          fulfilmentStatus: 'delivered',
+          codPaymentReceived: true,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

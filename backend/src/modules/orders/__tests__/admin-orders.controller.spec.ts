@@ -1,6 +1,10 @@
 /// <reference types="jest" />
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ROLES_KEY } from '../../auth/constants/auth.constants';
 import { AdminOrdersController } from '../admin-orders.controller';
+import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { OrdersService } from '../orders.service';
 
 describe('AdminOrdersController', () => {
@@ -72,5 +76,20 @@ describe('AdminOrdersController', () => {
       message: 'Order status updated successfully',
       data: updated,
     });
+  });
+
+  it('should require admin role via @Roles("admin") metadata', () => {
+    const roles = Reflect.getMetadata(ROLES_KEY, AdminOrdersController);
+    expect(roles).toEqual(['admin']);
+  });
+
+  it('should reject invalid non-boolean codPaymentReceived in UpdateOrderStatusDto', async () => {
+    const dto = plainToInstance(UpdateOrderStatusDto, {
+      fulfilmentStatus: 'delivered',
+      codPaymentReceived: 'yes',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('codPaymentReceived');
   });
 });

@@ -16,6 +16,7 @@ export interface AdminOrderQueryParams {
 
 export interface UpdateAdminOrderStatusPayload {
   fulfilmentStatus: OrderFulfilmentStatus;
+  codPaymentReceived?: boolean;
   note?: string;
   shippingProvider?: string;
   trackingNumber?: string;

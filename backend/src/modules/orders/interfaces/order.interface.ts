@@ -68,6 +68,7 @@ export interface FormattedOrder {
   trackingUrl?: string;
   shippedAt?: Date;
   deliveredAt?: Date;
+  paidAt?: Date;
   notes?: string;
   createdAt?: Date;
   updatedAt?: Date;

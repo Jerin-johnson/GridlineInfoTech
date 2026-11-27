@@ -236,6 +236,9 @@ export class MongoOrderRepository implements IOrderRepository {
       trackingUrl?: string;
       shippedAt?: Date;
       deliveredAt?: Date;
+      paidAt?: Date;
+      paymentStatus?: PaymentStatus;
+      codPaymentConfirmedBy?: string;
       cancelledAt?: Date;
       cancellationReason?: string;
       stockReserved?: boolean;
@@ -272,6 +275,15 @@ export class MongoOrderRepository implements IOrderRepository {
     }
     if (data.deliveredAt !== undefined) {
       setFields.deliveredAt = data.deliveredAt;
+    }
+    if (data.paidAt !== undefined) {
+      setFields.paidAt = data.paidAt;
+    }
+    if (data.paymentStatus !== undefined) {
+      setFields.paymentStatus = data.paymentStatus;
+    }
+    if (data.codPaymentConfirmedBy !== undefined) {
+      setFields.codPaymentConfirmedBy = data.codPaymentConfirmedBy;
     }
     if (data.cancelledAt !== undefined) {
       setFields.cancelledAt = data.cancelledAt;

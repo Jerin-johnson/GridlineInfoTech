@@ -165,10 +165,16 @@ export function AdminOrderDetailClient({
       }
     }
 
+    const isUnpaidCodDelivery =
+      order.paymentMethod === "cod" &&
+      order.paymentStatus !== "paid" &&
+      selectedTransition.target === "delivered";
+
     setSubmitting(true);
     try {
       const updated = await updateAdminOrderStatus(order.id, {
         fulfilmentStatus: selectedTransition.target,
+        ...(isUnpaidCodDelivery ? { codPaymentReceived: true } : {}),
         ...(noteTrimmed ? { note: noteTrimmed } : {}),
         ...(providerTrimmed ? { shippingProvider: providerTrimmed } : {}),
         ...(trackingTrimmed ? { trackingNumber: trackingTrimmed } : {}),
@@ -181,8 +187,11 @@ export function AdminOrderDetailClient({
       setTrackingUrl(updated.trackingUrl || "");
       setNote("");
       setSelectedTransition(null);
+      router.refresh();
       setActionSuccess(
-        `Order ${updated.orderNumber} updated to ${formatFulfilmentLabel(updated.fulfilmentStatus)}.`,
+        isUnpaidCodDelivery
+          ? `Order ${updated.orderNumber} marked as Delivered and COD payment confirmed.`
+          : `Order ${updated.orderNumber} updated to ${formatFulfilmentLabel(updated.fulfilmentStatus)}.`,
       );
     } catch (err) {
       setActionError(
@@ -423,19 +432,94 @@ export function AdminOrderDetailClient({
             />
           </label>
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={submitting}
-              className={`px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase font-medium cursor-pointer min-h-[44px] disabled:opacity-60 ${
-                selectedTransition.isDanger
-                  ? "bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3]"
-                  : "bg-[#F5F5F3] hover:bg-white text-[#080808]"
-              }`}
-            >
-              {submitting ? "Updating..." : `Confirm ${selectedTransition.label}`}
-            </button>
-          </div>
+          {order.paymentMethod === "cod" &&
+          order.paymentStatus !== "paid" &&
+          selectedTransition.target === "delivered" ? (
+            <div className="space-y-4">
+              <div className="border border-white/15 bg-[#080808] p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <p className="text-[10px] tracking-[0.16em] uppercase text-[#71717A]">
+                    Order Number
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-[#F5F5F3]">
+                    {order.orderNumber}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] tracking-[0.16em] uppercase text-[#71717A]">
+                    COD Amount Due
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-[#F5F5F3] tabular-nums">
+                    {formatPriceCents(order.totalAmount, order.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] tracking-[0.16em] uppercase text-[#71717A]">
+                    Payment Method
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-[#F5F5F3]">
+                    Cash on Delivery
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#A1A1AA]">
+                Explicit confirmation required: Has the full Cash on Delivery
+                payment been received for this order? Delivery cannot be
+                completed until COD payment is confirmed.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-[#F5F5F3] hover:bg-white text-[#080808] px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase font-medium cursor-pointer min-h-[44px] disabled:opacity-60"
+                >
+                  {submitting
+                    ? "Confirming..."
+                    : "Payment Received — Confirm Delivery"}
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    setSelectedTransition(null);
+                    setNote("");
+                    setActionError(
+                      "Payment has not been received. This COD order cannot be marked as delivered.",
+                    );
+                  }}
+                  className="bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase font-medium cursor-pointer min-h-[44px] disabled:opacity-60"
+                >
+                  Payment Not Received
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setSelectedTransition(null)}
+                  className="border border-white/15 px-4 py-2.5 text-[11px] tracking-[0.2em] uppercase text-[#A1A1AA] hover:text-[#F5F5F3] cursor-pointer min-h-[44px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase font-medium cursor-pointer min-h-[44px] disabled:opacity-60 ${
+                  selectedTransition.isDanger
+                    ? "bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3]"
+                    : "bg-[#F5F5F3] hover:bg-white text-[#080808]"
+                }`}
+              >
+                {submitting
+                  ? "Updating..."
+                  : `Confirm ${selectedTransition.label}`}
+              </button>
+            </div>
+          )}
         </form>
       )}
 
