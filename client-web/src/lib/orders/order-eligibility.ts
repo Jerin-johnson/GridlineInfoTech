@@ -27,7 +27,7 @@ export function canPayOrderOnline(order: FormattedOrder): boolean {
 export function getPayOnlineActionLabel(order: FormattedOrder): string {
   if (order.paymentMethod === "cod") return "Pay Online Now";
   if (order.paymentStatus === "failed") return "Retry Payment";
-  return "Resume Payment";
+  return "Complete Payment";
 }
 
 export function canCancelOrder(order: FormattedOrder): boolean {
