@@ -49,6 +49,7 @@ export interface IOrderRepository {
       allowedCurrentFulfilmentStatuses: FulfilmentStatus[];
       paymentStatus: PaymentStatus;
       fulfilmentStatus?: FulfilmentStatus;
+      paymentMethod?: string;
       stockReserved?: boolean;
       historyStatus: string;
       historyNote: string;
