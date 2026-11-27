@@ -166,9 +166,11 @@ export class OrdersService {
     const taxAmount = 0;
     const totalAmount = subtotal + shippingCost + taxAmount;
     const now = new Date();
-    const paymentExpiresAt = new Date(
-      now.getTime() + PAYMENT_WINDOW_MINUTES * 60 * 1000,
-    );
+    const paymentMethod = dto.paymentMethod ?? 'crypto_wallet';
+    const isCod = paymentMethod === 'cod';
+    const paymentExpiresAt = isCod
+      ? undefined
+      : new Date(now.getTime() + PAYMENT_WINDOW_MINUTES * 60 * 1000);
 
     const orderItems: OrderItem[] = preparedItems.map((item) => ({
       product: new Types.ObjectId(item.productId),
@@ -205,19 +207,21 @@ export class OrdersService {
       taxAmount,
       totalAmount,
       currency: 'USD',
-      paymentMethod: 'crypto_wallet',
+      paymentMethod,
       paymentStatus: 'pending',
       fulfilmentStatus: 'placed',
       statusHistory: [
         {
           status: 'placed',
-          note: 'Order placed and awaiting payment',
+          note: isCod
+            ? 'Order placed with Cash on Delivery'
+            : 'Order placed and awaiting payment',
           actor: 'customer',
           changedAt: now,
         },
       ],
       stockReserved: true,
-      paymentExpiresAt,
+      ...(paymentExpiresAt ? { paymentExpiresAt } : {}),
       notes: dto.notes?.trim() || undefined,
     };
 
@@ -487,7 +491,8 @@ export class OrdersService {
 
     if (
       PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus) &&
-      existing.paymentStatus !== 'paid'
+      existing.paymentStatus !== 'paid' &&
+      existing.paymentMethod !== 'cod'
     ) {
       throw new BadRequestException(
         `Cannot transition unpaid order (paymentStatus: '${existing.paymentStatus}') to '${dto.fulfilmentStatus}'`,
