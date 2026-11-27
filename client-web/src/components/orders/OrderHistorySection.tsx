@@ -17,6 +17,7 @@ import {
   canPayOrderOnline,
   formatFulfilmentLabel,
   formatPaymentStatusLabel,
+  getEffectivePaymentStatus,
   getFulfilmentToneClass,
   getPayOnlineActionLabel,
   getPaymentToneClass,
@@ -295,6 +296,7 @@ export function OrderHistorySection() {
             const itemCount = ord.items.reduce((sum, i) => sum + i.quantity, 0);
             const previewItems = ord.items.slice(0, 3);
             const overflowCount = Math.max(0, ord.items.length - 3);
+            const effectivePaymentStatus = getEffectivePaymentStatus(ord);
             const showPayOnline = canPayOrderOnline(ord);
             const showCancel = canCancelOrder(ord);
             const isConfirming = confirmCancelId === ord.id;
@@ -350,9 +352,9 @@ export function OrderHistorySection() {
                           {formatFulfilmentLabel(ord.fulfilmentStatus)}
                         </span>
                         <span
-                          className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getPaymentToneClass(ord.paymentStatus)}`}
+                          className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getPaymentToneClass(effectivePaymentStatus)}`}
                         >
-                          {formatPaymentStatusLabel(ord.paymentStatus)}
+                          {formatPaymentStatusLabel(effectivePaymentStatus)}
                         </span>
                       </div>
                       <p className="text-xs text-[#A1A1AA] truncate">

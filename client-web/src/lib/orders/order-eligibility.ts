@@ -2,7 +2,7 @@ import type {
   FormattedOrder,
   OrderFulfilmentStatus,
   OrderPaymentStatus,
-} from "@/types/order.types";
+} from "../../types/order.types";
 
 export function isOrderPaymentExpired(order: FormattedOrder): boolean {
   if (order.paymentStatus === "expired") return true;
@@ -11,15 +11,30 @@ export function isOrderPaymentExpired(order: FormattedOrder): boolean {
   return new Date(order.paymentExpiresAt).getTime() <= Date.now();
 }
 
+export function getEffectivePaymentStatus(
+  order: FormattedOrder,
+): OrderPaymentStatus {
+  if (order.paymentStatus === "pending" && isOrderPaymentExpired(order)) {
+    return "expired";
+  }
+  return order.paymentStatus;
+}
+
 export function canPayOrderOnline(order: FormattedOrder): boolean {
   if (order.fulfilmentStatus !== "placed") return false;
+
+  // Always allow reconciling an unresolved confirming on-chain transaction
+  if (order.paymentStatus === "confirming") {
+    return true;
+  }
+
   if (
     order.paymentStatus !== "pending" &&
-    order.paymentStatus !== "failed" &&
-    order.paymentStatus !== "confirming"
+    order.paymentStatus !== "failed"
   ) {
     return false;
   }
+
   if (isOrderPaymentExpired(order)) return false;
   return true;
 }
