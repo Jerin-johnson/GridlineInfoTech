@@ -560,7 +560,9 @@ export class OrdersService {
     const now = new Date();
     const note = dto.note?.trim() || undefined;
     const isConfirmingCodPayment =
-      isCodDeliveryConfirmation && isUnpaidCod && dto.codPaymentReceived === true;
+      isCodDeliveryConfirmation &&
+      isUnpaidCod &&
+      dto.codPaymentReceived === true;
     const shouldFinalizeCodStock =
       isConfirmingCodPayment && existing.stockReserved;
     const historyNote = isConfirmingCodPayment

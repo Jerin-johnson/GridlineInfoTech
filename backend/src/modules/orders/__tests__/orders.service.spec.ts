@@ -858,7 +858,9 @@ describe('OrdersService', () => {
 
       const summary = await service.getPaymentRevenueSummaryForAdmin();
       expect(summary.collectedRevenue).toBe(120000);
-      expect(mockOrderRepository.getPaymentRevenueSummary).toHaveBeenCalledTimes(1);
+      expect(
+        mockOrderRepository.getPaymentRevenueSummary,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it('should validate orderId in findCodOrderByIdForAdminPayment', async () => {
@@ -866,7 +868,9 @@ describe('OrdersService', () => {
         service.findCodOrderByIdForAdminPayment('invalid-id'),
       ).rejects.toThrow(BadRequestException);
 
-      mockOrderRepository.findCodOrderByIdForAdminPayment.mockResolvedValue(null);
+      mockOrderRepository.findCodOrderByIdForAdminPayment.mockResolvedValue(
+        null,
+      );
       const res = await service.findCodOrderByIdForAdminPayment(orderId);
       expect(res).toBeNull();
     });

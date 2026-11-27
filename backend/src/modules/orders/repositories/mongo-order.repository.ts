@@ -333,11 +333,7 @@ export class MongoOrderRepository implements IOrderRepository {
             _id: null,
             collectedRevenue: {
               $sum: {
-                $cond: [
-                  { $eq: ['$paymentStatus', 'paid'] },
-                  '$totalAmount',
-                  0,
-                ],
+                $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
               },
             },
             successfulPayments: {

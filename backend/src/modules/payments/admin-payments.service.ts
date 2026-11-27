@@ -4,48 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { AdminCodPaymentRecord } from '../orders/interfaces/order.interface';
 import { OrdersService } from '../orders/orders.service';
 import { PAYMENT_REPOSITORY } from './constants/payment.constants';
 import { AdminPaymentQueryDto } from './dto/admin-payment-query.dto';
 import type { IPaymentRepository } from './interfaces/payment-repository.interface';
-
-export interface AdminPaymentsSummary {
-  collectedRevenue: number;
-  successfulPayments: number;
-  pendingPayments: number;
-  failedExpiredPayments: number;
-  cryptoRevenue: number;
-  codCollected: number;
-}
-
-export interface AdminPaymentTransactionItem {
-  id: string;
-  source: 'payment' | 'cod_order';
-  paymentReference: string;
-  orderId: string;
-  orderNumber: string;
-  customerId: string;
-  customerName: string;
-  customerEmail: string;
-  paymentMethod: string;
-  currency: string;
-  orderTotalAmount: number;
-  expectedAmount?: string;
-  receivedAmount?: string;
-  token?: string;
-  tokenDecimals?: number;
-  network?: string;
-  chainId?: number;
-  status: string;
-  transactionHash?: string;
-  confirmations?: number;
-  requiredConfirmations?: number;
-  attemptNumber?: number;
-  failureReason?: string;
-  expiresAt?: Date;
-  verifiedAt?: Date;
-  createdAt: Date;
-}
+import type {
+  AdminCryptoPaymentRecord,
+  AdminPaymentsSummary,
+  AdminPaymentTransactionItem,
+} from './interfaces/payment.interface';
 
 const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
 const MAX_COMBINED_WINDOW = 2000;
@@ -97,21 +65,12 @@ export class AdminPaymentsService {
         filter,
         { page, limit },
       );
-      return {
-        data: cryptoResult.data.map<AdminPaymentTransactionItem>((item) => ({
-          ...item,
-          source: 'payment',
-        })),
-        meta: {
-          page,
-          limit,
-          total: cryptoResult.total,
-          totalPages:
-            cryptoResult.total === 0
-              ? 0
-              : Math.ceil(cryptoResult.total / limit),
-        },
-      };
+      return this.buildPaginatedResponse(
+        cryptoResult.data.map((item) => this.mapCryptoRecordToItem(item)),
+        page,
+        limit,
+        cryptoResult.total,
+      );
     }
 
     if (query.paymentMethod === 'cod') {
@@ -119,34 +78,14 @@ export class AdminPaymentsService {
         filter,
         { page, limit },
       );
-      return {
-        data: codResult.data.map<AdminPaymentTransactionItem>((item) => ({
-          id: item.id,
-          source: 'cod_order',
-          paymentReference: item.paymentReference,
-          orderId: item.id,
-          orderNumber: item.orderNumber,
-          customerId: item.customerId,
-          customerName: item.customerName,
-          customerEmail: item.customerEmail,
-          paymentMethod: item.paymentMethod,
-          currency: item.currency,
-          orderTotalAmount: item.orderTotalAmount,
-          status: item.paymentStatus,
-          verifiedAt: item.paidAt,
-          createdAt: item.createdAt,
-        })),
-        meta: {
-          page,
-          limit,
-          total: codResult.total,
-          totalPages:
-            codResult.total === 0 ? 0 : Math.ceil(codResult.total / limit),
-        },
-      };
+      return this.buildPaginatedResponse(
+        codResult.data.map((item) => this.mapCodRecordToItem(item)),
+        page,
+        limit,
+        codResult.total,
+      );
     }
 
-    // Combined ('all') query: fetch strictly bounded prefix windows from both modules
     const windowLimit = page * limit;
     if (windowLimit > MAX_COMBINED_WINDOW) {
       throw new BadRequestException(
@@ -166,45 +105,20 @@ export class AdminPaymentsService {
     ]);
 
     const combined: AdminPaymentTransactionItem[] = [
-      ...cryptoResult.data.map<AdminPaymentTransactionItem>((item) => ({
-        ...item,
-        source: 'payment',
-      })),
-      ...codResult.data.map<AdminPaymentTransactionItem>((item) => ({
-        id: item.id,
-        source: 'cod_order',
-        paymentReference: item.paymentReference,
-        orderId: item.id,
-        orderNumber: item.orderNumber,
-        customerId: item.customerId,
-        customerName: item.customerName,
-        customerEmail: item.customerEmail,
-        paymentMethod: item.paymentMethod,
-        currency: item.currency,
-        orderTotalAmount: item.orderTotalAmount,
-        status: item.paymentStatus,
-        verifiedAt: item.paidAt,
-        createdAt: item.createdAt,
-      })),
-    ];
-
-    combined.sort(
+      ...cryptoResult.data.map((item) => this.mapCryptoRecordToItem(item)),
+      ...codResult.data.map((item) => this.mapCodRecordToItem(item)),
+    ].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
 
     const start = (page - 1) * limit;
-    const total = cryptoResult.total + codResult.total;
-
-    return {
-      data: combined.slice(start, start + limit),
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
-      },
-    };
+    return this.buildPaginatedResponse(
+      combined.slice(start, start + limit),
+      page,
+      limit,
+      cryptoResult.total + codResult.total,
+    );
   }
 
   async findTransactionById(transactionId: string) {
@@ -232,7 +146,9 @@ export class AdminPaymentsService {
       await this.ordersService.findCodOrderByIdForAdminPayment(transactionId);
 
     if (!codOrder) {
-      throw new NotFoundException(`Payment record '${transactionId}' not found`);
+      throw new NotFoundException(
+        `Payment record '${transactionId}' not found`,
+      );
     }
 
     const priorCryptoAttempts =
@@ -269,6 +185,53 @@ export class AdminPaymentsService {
       verifiedAt: codOrder.paidAt,
       createdAt: codOrder.createdAt,
       attemptHistory: priorCryptoAttempts,
+    };
+  }
+
+  private mapCryptoRecordToItem(
+    item: AdminCryptoPaymentRecord,
+  ): AdminPaymentTransactionItem {
+    return {
+      ...item,
+      source: 'payment',
+    };
+  }
+
+  private mapCodRecordToItem(
+    item: AdminCodPaymentRecord,
+  ): AdminPaymentTransactionItem {
+    return {
+      id: item.id,
+      source: 'cod_order',
+      paymentReference: item.paymentReference,
+      orderId: item.id,
+      orderNumber: item.orderNumber,
+      customerId: item.customerId,
+      customerName: item.customerName,
+      customerEmail: item.customerEmail,
+      paymentMethod: item.paymentMethod,
+      currency: item.currency,
+      orderTotalAmount: item.orderTotalAmount,
+      status: item.paymentStatus,
+      verifiedAt: item.paidAt,
+      createdAt: item.createdAt,
+    };
+  }
+
+  private buildPaginatedResponse(
+    data: AdminPaymentTransactionItem[],
+    page: number,
+    limit: number,
+    total: number,
+  ) {
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
     };
   }
 

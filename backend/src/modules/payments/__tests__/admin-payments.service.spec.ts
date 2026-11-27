@@ -174,10 +174,9 @@ describe('AdminPaymentsService', () => {
         paymentMethod: 'cod',
       });
 
-      expect(mockOrdersService.findCodOrdersForAdminPayments).toHaveBeenCalledWith(
-        expect.any(Object),
-        { page: 1, limit: 15 },
-      );
+      expect(
+        mockOrdersService.findCodOrdersForAdminPayments,
+      ).toHaveBeenCalledWith(expect.any(Object), { page: 1, limit: 15 });
       expect(mockPaymentRepository.findAllForAdmin).not.toHaveBeenCalled();
       expect(res.data[0].source).toBe('cod_order');
     });
@@ -370,9 +369,9 @@ describe('AdminPaymentsService', () => {
 
       mockPaymentRepository.findByIdForAdmin.mockResolvedValue(null);
       mockOrdersService.findCodOrderByIdForAdminPayment.mockResolvedValue(null);
-      await expect(
-        service.findTransactionById(validPaymentId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findTransactionById(validPaymentId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

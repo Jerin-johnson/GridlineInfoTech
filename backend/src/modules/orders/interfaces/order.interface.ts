@@ -94,7 +94,14 @@ export interface OrderPaymentRevenueSummary {
 
 export interface AdminCodPaymentFilter {
   search?: string;
-  status?: 'all' | 'verified' | 'paid' | 'pending' | 'confirming' | 'failed' | 'expired';
+  status?:
+    | 'all'
+    | 'verified'
+    | 'paid'
+    | 'pending'
+    | 'confirming'
+    | 'failed'
+    | 'expired';
   dateFrom?: Date;
   dateTo?: Date;
 }

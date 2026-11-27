@@ -134,3 +134,41 @@ export interface AdminCryptoPaymentDetailRecord {
   verifiedAt?: Date;
   createdAt?: Date;
 }
+
+export interface AdminPaymentsSummary {
+  collectedRevenue: number;
+  successfulPayments: number;
+  pendingPayments: number;
+  failedExpiredPayments: number;
+  cryptoRevenue: number;
+  codCollected: number;
+}
+
+export interface AdminPaymentTransactionItem {
+  id: string;
+  source: 'payment' | 'cod_order';
+  paymentReference: string;
+  orderId: string;
+  orderNumber: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  paymentMethod: string;
+  currency: string;
+  orderTotalAmount: number;
+  expectedAmount?: string;
+  receivedAmount?: string;
+  token?: string;
+  tokenDecimals?: number;
+  network?: string;
+  chainId?: number;
+  status: string;
+  transactionHash?: string;
+  confirmations?: number;
+  requiredConfirmations?: number;
+  attemptNumber?: number;
+  failureReason?: string;
+  expiresAt?: Date;
+  verifiedAt?: Date;
+  createdAt: Date;
+}
