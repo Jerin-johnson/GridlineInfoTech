@@ -21,7 +21,8 @@ import {
   updateAdminProduct,
   uploadAdminProductImage,
 } from "@/lib/api/admin-products.api";
-import { getBrands, getCategories } from "@/lib/api/catalog.api";
+import { getAdminBrands } from "@/lib/api/admin-brands.api";
+import { getAdminCategories } from "@/lib/api/admin-categories.api";
 import { ApiError } from "@/lib/api/client";
 import type {
   CatalogBrand,
@@ -123,18 +124,51 @@ export function AdminProductForm({
 
   const [isDirty, setIsDirty] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [taxonomyError, setTaxonomyError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
+  const initialCategoryId =
+    typeof initialProduct?.category === "object" && initialProduct.category
+      ? initialProduct.category._id
+      : typeof initialProduct?.category === "string"
+        ? initialProduct.category
+        : "";
+  const initialBrandId =
+    typeof initialProduct?.brand === "object" && initialProduct.brand
+      ? initialProduct.brand._id
+      : typeof initialProduct?.brand === "string"
+        ? initialProduct.brand
+        : "";
+
   useEffect(() => {
     let active = true;
-    Promise.all([getCategories(), getBrands()])
-      .then(([cats, brs]) => {
+
+    Promise.all([
+      getAdminCategories({ status: "all" }),
+      getAdminBrands({ status: "all" }),
+    ])
+      .then(([catRes, brandRes]) => {
         if (!active) return;
-        setCategories(cats);
-        setBrands(brs);
-        if (!categoryId && cats.length > 0) setCategoryId(cats[0]._id);
-        if (!brandId && brs.length > 0) setBrandId(brs[0]._id);
+        const visibleCategories = catRes.data.filter(
+          (c) => c.status === "active" || c._id === initialCategoryId,
+        );
+        const visibleBrands = brandRes.data.filter(
+          (b) => b.status === "active" || b._id === initialBrandId,
+        );
+        setCategories(visibleCategories);
+        setBrands(visibleBrands);
+        setTaxonomyError(null);
+        setCategoryId((prev) => prev || visibleCategories[0]?._id || "");
+        setBrandId((prev) => prev || visibleBrands[0]?._id || "");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setTaxonomyError(
+          err instanceof ApiError
+            ? err.message
+            : "Unable to load categories and brands.",
+        );
       })
       .finally(() => {
         if (active) setLoadingTaxonomies(false);
@@ -143,7 +177,7 @@ export function AdminProductForm({
     return () => {
       active = false;
     };
-  }, [brandId, categoryId]);
+  }, [initialBrandId, initialCategoryId]);
 
   // Warn on unsaved changes when leaving page
   useEffect(() => {
@@ -507,47 +541,118 @@ export function AdminProductForm({
                 />
               </label>
 
-              <label className="space-y-1.5 text-xs">
-                <span className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] block">
-                  Category *
-                </span>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="product-category-select"
+                    className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA]"
+                  >
+                    Category *
+                  </label>
+                  <Link
+                    href="/admin/categories/new"
+                    className="text-[10px] tracking-[0.14em] uppercase text-[#A1A1AA] hover:text-[#F5F5F3]"
+                  >
+                    + New Category
+                  </Link>
+                </div>
                 <select
+                  id="product-category-select"
                   required
+                  disabled={loadingTaxonomies || categories.length === 0}
                   value={categoryId}
                   onChange={(e) => {
                     setCategoryId(e.target.value);
                     markDirty();
                   }}
-                  className="w-full h-11 bg-[#141417] border border-white/15 px-3 text-sm text-[#F5F5F3] focus:outline-none focus:border-[#F5F5F3]"
+                  className="w-full h-11 bg-[#141417] border border-white/15 px-3 text-sm text-[#F5F5F3] focus:outline-none focus:border-[#F5F5F3] disabled:opacity-60"
                 >
-                  {categories.map((cat) => (
-                    <option key={cat._id} value={cat._id}>
-                      {cat.name}
-                    </option>
-                  ))}
+                  {loadingTaxonomies ? (
+                    <option value="">Loading categories...</option>
+                  ) : categories.length === 0 ? (
+                    <option value="">No active categories</option>
+                  ) : (
+                    categories.map((cat) => (
+                      <option key={cat._id} value={cat._id}>
+                        {cat.name}
+                        {cat.status === "inactive" ? " (Inactive)" : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
-              </label>
+                {!loadingTaxonomies && categories.length === 0 && (
+                  <p className="text-[11px] text-[#C81E1E]">
+                    No active categories found.{" "}
+                    <Link
+                      href="/admin/categories/new"
+                      className="underline text-[#F5F5F3]"
+                    >
+                      Create Category
+                    </Link>
+                  </p>
+                )}
+              </div>
 
-              <label className="space-y-1.5 text-xs">
-                <span className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] block">
-                  Brand *
-                </span>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="product-brand-select"
+                    className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA]"
+                  >
+                    Brand *
+                  </label>
+                  <Link
+                    href="/admin/brands/new"
+                    className="text-[10px] tracking-[0.14em] uppercase text-[#A1A1AA] hover:text-[#F5F5F3]"
+                  >
+                    + New Brand
+                  </Link>
+                </div>
                 <select
+                  id="product-brand-select"
                   required
+                  disabled={loadingTaxonomies || brands.length === 0}
                   value={brandId}
                   onChange={(e) => {
                     setBrandId(e.target.value);
                     markDirty();
                   }}
-                  className="w-full h-11 bg-[#141417] border border-white/15 px-3 text-sm text-[#F5F5F3] focus:outline-none focus:border-[#F5F5F3]"
+                  className="w-full h-11 bg-[#141417] border border-white/15 px-3 text-sm text-[#F5F5F3] focus:outline-none focus:border-[#F5F5F3] disabled:opacity-60"
                 >
-                  {brands.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  {loadingTaxonomies ? (
+                    <option value="">Loading brands...</option>
+                  ) : brands.length === 0 ? (
+                    <option value="">No active brands</option>
+                  ) : (
+                    brands.map((b) => (
+                      <option key={b._id} value={b._id}>
+                        {b.name}
+                        {b.status === "inactive" ? " (Inactive)" : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
-              </label>
+                {!loadingTaxonomies && brands.length === 0 && (
+                  <p className="text-[11px] text-[#C81E1E]">
+                    No active brands found.{" "}
+                    <Link
+                      href="/admin/brands/new"
+                      className="underline text-[#F5F5F3]"
+                    >
+                      Create Brand
+                    </Link>
+                  </p>
+                )}
+              </div>
+
+              {taxonomyError && (
+                <p
+                  role="alert"
+                  className="sm:col-span-2 text-xs text-[#C81E1E]"
+                >
+                  {taxonomyError}
+                </p>
+              )}
 
               <label className="space-y-1.5 text-xs sm:col-span-2">
                 <span className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] block">

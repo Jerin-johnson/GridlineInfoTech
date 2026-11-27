@@ -5,6 +5,7 @@ import {
   Package,
   Boxes,
   FolderTree,
+  Tag,
   Users,
   Wallet,
   Settings,
@@ -59,7 +60,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Categories",
         href: "/admin/categories",
         icon: FolderTree,
-        enabled: false,
+        enabled: true,
+      },
+      {
+        label: "Brands",
+        href: "/admin/brands",
+        icon: Tag,
+        enabled: true,
       },
       {
         label: "Customers",
