@@ -92,6 +92,12 @@ export class PaymentsService {
       dto.orderId,
     );
 
+    if (order.paymentMethod === 'cod') {
+      throw new BadRequestException(
+        'Crypto payment is not applicable for Cash on Delivery orders',
+      );
+    }
+
     if (order.paymentStatus === 'paid') {
       throw new ConflictException('Order has already been paid');
     }
@@ -102,7 +108,10 @@ export class PaymentsService {
       );
     }
 
-    if (new Date(order.paymentExpiresAt).getTime() <= Date.now()) {
+    if (
+      order.paymentExpiresAt &&
+      new Date(order.paymentExpiresAt).getTime() <= Date.now()
+    ) {
       await this.expireOrderAndReleaseStock(order, userId);
       throw new BadRequestException('Order payment window has expired');
     }
@@ -156,7 +165,9 @@ export class PaymentsService {
       confirmations: 0,
       requiredConfirmations: config.requiredConfirmations,
       verificationStatus: 'pending',
-      expiresAt: new Date(order.paymentExpiresAt),
+      expiresAt: order.paymentExpiresAt
+        ? new Date(order.paymentExpiresAt)
+        : new Date(Date.now() + 30 * 60 * 1000),
     });
 
     return this.formatPayment(created);
@@ -261,7 +272,10 @@ export class PaymentsService {
 
     const isOrderExpired =
       order.paymentStatus === 'expired' ||
-      new Date(order.paymentExpiresAt).getTime() <= Date.now();
+      Boolean(
+        order.paymentExpiresAt &&
+          new Date(order.paymentExpiresAt).getTime() <= Date.now(),
+      );
 
     const verification = await this.blockchainVerifierService.verifyTransaction(
       {
@@ -749,7 +763,9 @@ export class PaymentsService {
           requiredConfirmations: params.config.requiredConfirmations,
           verificationStatus: params.verificationStatus,
           failureReason: params.failureReason,
-          expiresAt: new Date(params.order.paymentExpiresAt),
+          expiresAt: params.order.paymentExpiresAt
+            ? new Date(params.order.paymentExpiresAt)
+            : new Date(),
           verifiedAt: params.verifiedAt,
         },
         session,

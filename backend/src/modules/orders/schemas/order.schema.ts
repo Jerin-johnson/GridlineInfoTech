@@ -155,8 +155,8 @@ export class Order {
   @Prop({ required: true, default: true })
   stockReserved!: boolean;
 
-  @Prop({ required: true })
-  paymentExpiresAt!: Date;
+  @Prop()
+  paymentExpiresAt?: Date;
 
   @Prop()
   cancelledAt?: Date;

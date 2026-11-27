@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Lock } from "lucide-react";
@@ -31,7 +30,6 @@ export function CartSummaryCard({
   isBusy,
 }: CartSummaryCardProps) {
   const router = useRouter();
-  const [checkoutNotice, setCheckoutNotice] = useState<string | null>(null);
 
   const hasUnavailableItems = items.some(
     (item) => !item.isAvailable || item.quantity < 1,
@@ -48,10 +46,7 @@ export function CartSummaryCard({
       return;
     }
 
-    // /checkout route is not yet implemented in client-web/src/app
-    setCheckoutNotice(
-      "Your bag is validated and ready. The /checkout flow is scheduled for the next milestone.",
-    );
+    router.push("/checkout");
   };
 
   return (
@@ -143,15 +138,6 @@ export function CartSummaryCard({
             Sign in at the next step to finalize checkout. Your bag will be
             preserved.
           </p>
-        )}
-
-        {checkoutNotice && (
-          <div
-            role="status"
-            className="border border-white/10 bg-[#141417] p-3.5 text-xs text-[#A1A1AA]"
-          >
-            {checkoutNotice}
-          </div>
         )}
 
         <Link

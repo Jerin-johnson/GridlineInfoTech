@@ -60,7 +60,7 @@ export interface FormattedOrder {
   fulfilmentStatus: FulfilmentStatus;
   statusHistory: FormattedOrderStatusHistoryEntry[];
   stockReserved: boolean;
-  paymentExpiresAt: Date;
+  paymentExpiresAt?: Date;
   cancelledAt?: Date;
   cancellationReason?: string;
   shippingProvider?: string;
