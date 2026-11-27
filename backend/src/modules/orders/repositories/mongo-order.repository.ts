@@ -14,6 +14,11 @@ import {
   OrderListFilter,
   OrderListResult,
 } from '../interfaces/order-repository.interface';
+import {
+  AdminCodPaymentFilter,
+  AdminCodPaymentRecord,
+  OrderPaymentRevenueSummary,
+} from '../interfaces/order.interface';
 import { Order, OrderDocument } from '../schemas/order.schema';
 
 @Injectable()
@@ -313,5 +318,189 @@ export class MongoOrderRepository implements IOrderRepository {
       )
       .populate('user', 'firstName lastName email phone')
       .exec();
+  }
+
+  async getPaymentRevenueSummary(): Promise<OrderPaymentRevenueSummary> {
+    const agg = await this.orderModel
+      .aggregate<OrderPaymentRevenueSummary>([
+        {
+          $match: {
+            fulfilmentStatus: { $ne: 'cancelled' },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            collectedRevenue: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$paymentStatus', 'paid'] },
+                  '$totalAmount',
+                  0,
+                ],
+              },
+            },
+            successfulPayments: {
+              $sum: {
+                $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0],
+              },
+            },
+            pendingPayments: {
+              $sum: {
+                $cond: [
+                  { $in: ['$paymentStatus', ['pending', 'confirming']] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            cryptoRevenue: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$paymentStatus', 'paid'] },
+                      { $eq: ['$paymentMethod', 'crypto_wallet'] },
+                    ],
+                  },
+                  '$totalAmount',
+                  0,
+                ],
+              },
+            },
+            codCollected: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$paymentStatus', 'paid'] },
+                      { $eq: ['$paymentMethod', 'cod'] },
+                    ],
+                  },
+                  '$totalAmount',
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ])
+      .exec();
+
+    return (
+      agg[0] ?? {
+        collectedRevenue: 0,
+        successfulPayments: 0,
+        pendingPayments: 0,
+        cryptoRevenue: 0,
+        codCollected: 0,
+      }
+    );
+  }
+
+  async countFailedOrExpiredCodOrders(): Promise<number> {
+    return this.orderModel
+      .countDocuments({
+        paymentMethod: 'cod',
+        paymentStatus: { $in: ['failed', 'expired'] },
+      })
+      .exec();
+  }
+
+  async findCodOrdersForAdminPayments(
+    filter: AdminCodPaymentFilter,
+    options: { page: number; limit: number },
+  ): Promise<{ data: AdminCodPaymentRecord[]; total: number }> {
+    const query: FilterQuery<OrderDocument> = {
+      paymentMethod: 'cod',
+    };
+
+    if (filter.status && filter.status !== 'all') {
+      if (filter.status === 'verified' || filter.status === 'paid') {
+        query.paymentStatus = 'paid';
+      } else {
+        query.paymentStatus = filter.status;
+      }
+    }
+
+    if (filter.dateFrom || filter.dateTo) {
+      const createdAtFilter: Record<string, Date> = {};
+      if (filter.dateFrom) createdAtFilter.$gte = filter.dateFrom;
+      if (filter.dateTo) createdAtFilter.$lte = filter.dateTo;
+      query.createdAt = createdAtFilter;
+    }
+
+    if (filter.search?.trim()) {
+      const escaped = filter.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      query.$or = [
+        { paymentReference: regex },
+        { orderNumber: regex },
+        { customerEmail: regex },
+      ];
+    }
+
+    const skip = (options.page - 1) * options.limit;
+    const [docs, total] = await Promise.all([
+      this.orderModel
+        .find(query)
+        .populate('user', 'firstName lastName email')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(options.limit)
+        .exec(),
+      this.orderModel.countDocuments(query).exec(),
+    ]);
+
+    return {
+      data: docs.map((doc) => this.mapCodOrderToPaymentRecord(doc)),
+      total,
+    };
+  }
+
+  async findCodOrderByIdForAdminPayment(
+    orderId: string,
+  ): Promise<AdminCodPaymentRecord | null> {
+    const doc = await this.orderModel
+      .findOne({ _id: new Types.ObjectId(orderId), paymentMethod: 'cod' })
+      .populate('user', 'firstName lastName email')
+      .exec();
+    return doc ? this.mapCodOrderToPaymentRecord(doc) : null;
+  }
+
+  private mapCodOrderToPaymentRecord(
+    doc: OrderDocument,
+  ): AdminCodPaymentRecord {
+    const userObj = doc.user as unknown as {
+      _id?: Types.ObjectId;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    } | null;
+
+    const customerId = userObj?._id
+      ? userObj._id.toString()
+      : doc.user.toString();
+    const customerName = userObj?.firstName
+      ? `${userObj.firstName} ${userObj.lastName ?? ''}`.trim()
+      : doc.customerEmail;
+
+    return {
+      id: doc._id.toString(),
+      orderNumber: doc.orderNumber,
+      paymentReference: doc.paymentReference,
+      customerId,
+      customerName,
+      customerEmail: userObj?.email ?? doc.customerEmail,
+      paymentMethod: doc.paymentMethod,
+      currency: doc.currency,
+      orderTotalAmount: doc.totalAmount,
+      paymentStatus: doc.paymentStatus,
+      fulfilmentStatus: doc.fulfilmentStatus,
+      paidAt: doc.paidAt,
+      createdAt: doc.createdAt ?? new Date(),
+    };
   }
 }

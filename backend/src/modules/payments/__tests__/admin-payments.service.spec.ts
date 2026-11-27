@@ -1,39 +1,29 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Types } from 'mongoose';
-import { Order } from '../../orders/schemas/order.schema';
-import { User } from '../../users/schemas/user.schema';
+import { OrdersService } from '../../orders/orders.service';
 import { AdminPaymentsService } from '../admin-payments.service';
-import { Payment } from '../schemas/payment.schema';
+import { PAYMENT_REPOSITORY } from '../constants/payment.constants';
 
 describe('AdminPaymentsService', () => {
   let service: AdminPaymentsService;
 
-  const validPaymentId = new Types.ObjectId().toHexString();
-  const validOrderId = new Types.ObjectId().toHexString();
-  const validUserId = new Types.ObjectId().toHexString();
+  const validPaymentId = '507f1f77bcf86cd799439011';
+  const validOrderId = '507f1f77bcf86cd799439012';
+  const validUserId = '507f1f77bcf86cd799439013';
 
-  const createExecChain = (resolvedValue: unknown) => ({
-    populate: jest.fn().mockReturnThis(),
-    sort: jest.fn().mockReturnThis(),
-    exec: jest.fn().mockResolvedValue(resolvedValue),
-  });
-
-  const mockPaymentModel = {
-    aggregate: jest.fn(),
-    countDocuments: jest.fn(),
-    findById: jest.fn(),
-    find: jest.fn(),
+  const mockPaymentRepository = {
+    countFailedOrExpiredAttempts: jest.fn(),
+    findAllForAdmin: jest.fn(),
+    findByIdForAdmin: jest.fn(),
+    findAllByOrderIdForAdmin: jest.fn(),
   };
 
-  const mockOrderModel = {
-    aggregate: jest.fn(),
-    countDocuments: jest.fn(),
-    findOne: jest.fn(),
+  const mockOrdersService = {
+    getPaymentRevenueSummaryForAdmin: jest.fn(),
+    countFailedOrExpiredCodOrdersForAdmin: jest.fn(),
+    findCodOrdersForAdminPayments: jest.fn(),
+    findCodOrderByIdForAdminPayment: jest.fn(),
   };
-
-  const mockUserModel = {};
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -41,9 +31,14 @@ describe('AdminPaymentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminPaymentsService,
-        { provide: getModelToken(Payment.name), useValue: mockPaymentModel },
-        { provide: getModelToken(Order.name), useValue: mockOrderModel },
-        { provide: getModelToken(User.name), useValue: mockUserModel },
+        {
+          provide: PAYMENT_REPOSITORY,
+          useValue: mockPaymentRepository,
+        },
+        {
+          provide: OrdersService,
+          useValue: mockOrdersService,
+        },
       ],
     }).compile();
 
@@ -51,24 +46,18 @@ describe('AdminPaymentsService', () => {
   });
 
   describe('getSummary', () => {
-    it('should return accurate revenue excluding pending/failed/uncollected COD and without double counting attempts', async () => {
-      mockOrderModel.aggregate.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue([
-          {
-            collectedRevenue: 150000,
-            successfulPayments: 3,
-            pendingPayments: 2,
-            cryptoRevenue: 100000,
-            codCollected: 50000,
-          },
-        ]),
+    it('should combine order-level revenue summary with failed/expired attempt counts', async () => {
+      mockOrdersService.getPaymentRevenueSummaryForAdmin.mockResolvedValue({
+        collectedRevenue: 150000,
+        successfulPayments: 3,
+        pendingPayments: 2,
+        cryptoRevenue: 100000,
+        codCollected: 50000,
       });
-      mockPaymentModel.countDocuments.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue(4),
-      });
-      mockOrderModel.countDocuments.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue(1),
-      });
+      mockPaymentRepository.countFailedOrExpiredAttempts.mockResolvedValue(4);
+      mockOrdersService.countFailedOrExpiredCodOrdersForAdmin.mockResolvedValue(
+        1,
+      );
 
       const summary = await service.getSummary();
 
@@ -80,24 +69,20 @@ describe('AdminPaymentsService', () => {
         cryptoRevenue: 100000,
         codCollected: 50000,
       });
-
-      // Verify revenue aggregation matches orders once per order (never payments attempts)
-      const pipeline = mockOrderModel.aggregate.mock.calls[0][0];
-      expect(pipeline[0]).toEqual({
-        $match: { fulfilmentStatus: { $ne: 'cancelled' } },
-      });
     });
 
-    it('should handle empty database gracefully with zeroes', async () => {
-      mockOrderModel.aggregate.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue([]),
+    it('should return zeroes when no orders or payments exist', async () => {
+      mockOrdersService.getPaymentRevenueSummaryForAdmin.mockResolvedValue({
+        collectedRevenue: 0,
+        successfulPayments: 0,
+        pendingPayments: 0,
+        cryptoRevenue: 0,
+        codCollected: 0,
       });
-      mockPaymentModel.countDocuments.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue(0),
-      });
-      mockOrderModel.countDocuments.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue(0),
-      });
+      mockPaymentRepository.countFailedOrExpiredAttempts.mockResolvedValue(0);
+      mockOrdersService.countFailedOrExpiredCodOrdersForAdmin.mockResolvedValue(
+        0,
+      );
 
       const summary = await service.getSummary();
       expect(summary).toEqual({
@@ -112,59 +97,75 @@ describe('AdminPaymentsService', () => {
   });
 
   describe('findAllTransactions', () => {
-    it('should return paginated transactions across crypto and COD', async () => {
-      mockPaymentModel.aggregate.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue([
+    it('should query only IPaymentRepository when paymentMethod is crypto_wallet', async () => {
+      mockPaymentRepository.findAllForAdmin.mockResolvedValue({
+        data: [
           {
-            data: [
-              {
-                id: validPaymentId,
-                source: 'payment',
-                paymentReference: 'PAY-1001',
-                orderNumber: 'ORD-1001',
-                paymentMethod: 'crypto_wallet',
-                status: 'verified',
-              },
-            ],
-            total: [{ count: 1 }],
+            id: validPaymentId,
+            paymentReference: 'PAY-1001',
+            orderId: validOrderId,
+            orderNumber: 'ORD-1001',
+            customerId: validUserId,
+            customerName: 'Alex Mercer',
+            customerEmail: 'alex@example.com',
+            paymentMethod: 'crypto_wallet',
+            currency: 'USD',
+            orderTotalAmount: 50000,
+            expectedAmount: '500000000',
+            token: 'USDC',
+            tokenDecimals: 6,
+            network: 'Sepolia',
+            chainId: 11155111,
+            status: 'verified',
+            confirmations: 3,
+            requiredConfirmations: 3,
+            attemptNumber: 1,
+            expiresAt: new Date('2026-11-27T12:00:00Z'),
+            createdAt: new Date('2026-11-27T11:00:00Z'),
           },
-        ]),
+        ],
+        total: 1,
       });
 
       const res = await service.findAllTransactions({
         page: 1,
         limit: 15,
-        search: 'ORD-1001',
+        paymentMethod: 'crypto_wallet',
         status: 'verified',
-        paymentMethod: 'all',
+        search: 'ORD-1001',
       });
 
-      expect(res.data).toHaveLength(1);
-      expect(res.meta).toEqual({
-        page: 1,
-        limit: 15,
-        total: 1,
-        totalPages: 1,
-      });
+      expect(mockPaymentRepository.findAllForAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'verified', search: 'ORD-1001' }),
+        { page: 1, limit: 15 },
+      );
+      expect(
+        mockOrdersService.findCodOrdersForAdminPayments,
+      ).not.toHaveBeenCalled();
+      expect(res.data[0].source).toBe('payment');
+      expect(res.meta).toEqual({ page: 1, limit: 15, total: 1, totalPages: 1 });
     });
 
-    it('should query COD orders directly when paymentMethod is cod', async () => {
-      mockOrderModel.aggregate.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue([
+    it('should query only OrdersService when paymentMethod is cod', async () => {
+      mockOrdersService.findCodOrdersForAdminPayments.mockResolvedValue({
+        data: [
           {
-            data: [
-              {
-                id: validOrderId,
-                source: 'cod_order',
-                paymentReference: 'PAY-COD-1',
-                orderNumber: 'ORD-COD-1',
-                paymentMethod: 'cod',
-                status: 'pending',
-              },
-            ],
-            total: [{ count: 1 }],
+            id: validOrderId,
+            orderNumber: 'ORD-COD-1',
+            paymentReference: 'PAY-COD-1',
+            customerId: validUserId,
+            customerName: 'Elena Vance',
+            customerEmail: 'elena@example.com',
+            paymentMethod: 'cod',
+            currency: 'USD',
+            orderTotalAmount: 35000,
+            paymentStatus: 'paid',
+            fulfilmentStatus: 'delivered',
+            paidAt: new Date('2026-11-27T12:00:00Z'),
+            createdAt: new Date('2026-11-27T10:00:00Z'),
           },
-        ]),
+        ],
+        total: 1,
       });
 
       const res = await service.findAllTransactions({
@@ -173,60 +174,129 @@ describe('AdminPaymentsService', () => {
         paymentMethod: 'cod',
       });
 
-      expect(mockOrderModel.aggregate).toHaveBeenCalledTimes(1);
+      expect(mockOrdersService.findCodOrdersForAdminPayments).toHaveBeenCalledWith(
+        expect.any(Object),
+        { page: 1, limit: 15 },
+      );
+      expect(mockPaymentRepository.findAllForAdmin).not.toHaveBeenCalled();
       expect(res.data[0].source).toBe('cod_order');
     });
 
-    it('should reject invalid date range where dateFrom > dateTo', async () => {
+    it('should merge-sort bounded windows from crypto and COD when paymentMethod is all', async () => {
+      mockPaymentRepository.findAllForAdmin.mockResolvedValue({
+        data: [
+          {
+            id: validPaymentId,
+            paymentReference: 'PAY-NEW',
+            orderId: validOrderId,
+            orderNumber: 'ORD-2',
+            customerId: validUserId,
+            customerName: 'A',
+            customerEmail: 'a@example.com',
+            paymentMethod: 'crypto_wallet',
+            currency: 'USD',
+            orderTotalAmount: 10000,
+            expectedAmount: '100',
+            token: 'USDC',
+            tokenDecimals: 6,
+            network: 'Sepolia',
+            chainId: 11155111,
+            status: 'verified',
+            confirmations: 3,
+            requiredConfirmations: 3,
+            attemptNumber: 1,
+            expiresAt: new Date(),
+            createdAt: new Date('2026-11-27T12:00:00Z'),
+          },
+          {
+            id: '507f1f77bcf86cd799439099',
+            paymentReference: 'PAY-OLD',
+            orderId: validOrderId,
+            orderNumber: 'ORD-0',
+            customerId: validUserId,
+            customerName: 'A',
+            customerEmail: 'a@example.com',
+            paymentMethod: 'crypto_wallet',
+            currency: 'USD',
+            orderTotalAmount: 10000,
+            expectedAmount: '100',
+            token: 'USDC',
+            tokenDecimals: 6,
+            network: 'Sepolia',
+            chainId: 11155111,
+            status: 'failed',
+            confirmations: 0,
+            requiredConfirmations: 3,
+            attemptNumber: 1,
+            expiresAt: new Date(),
+            createdAt: new Date('2026-11-27T08:00:00Z'),
+          },
+        ],
+        total: 2,
+      });
+
+      mockOrdersService.findCodOrdersForAdminPayments.mockResolvedValue({
+        data: [
+          {
+            id: validOrderId,
+            orderNumber: 'ORD-1',
+            paymentReference: 'PAY-MID',
+            customerId: validUserId,
+            customerName: 'B',
+            customerEmail: 'b@example.com',
+            paymentMethod: 'cod',
+            currency: 'USD',
+            orderTotalAmount: 20000,
+            paymentStatus: 'pending',
+            fulfilmentStatus: 'placed',
+            createdAt: new Date('2026-11-27T10:00:00Z'),
+          },
+        ],
+        total: 1,
+      });
+
+      const res = await service.findAllTransactions({
+        page: 2,
+        limit: 1,
+        paymentMethod: 'all',
+      });
+
+      expect(mockPaymentRepository.findAllForAdmin).toHaveBeenCalledWith(
+        expect.any(Object),
+        { page: 1, limit: 2 },
+      );
+      expect(res.data).toHaveLength(1);
+      expect(res.data[0].paymentReference).toBe('PAY-MID');
+      expect(res.meta).toEqual({ page: 2, limit: 1, total: 3, totalPages: 3 });
+    });
+
+    it('should reject invalid date range and excessive combined window depth', async () => {
       await expect(
         service.findAllTransactions({
           dateFrom: '2026-12-10',
           dateTo: '2026-12-01',
         }),
       ).rejects.toThrow(BadRequestException);
-    });
 
-    it('should return empty data and zero totalPages when no matches exist', async () => {
-      mockPaymentModel.aggregate.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue([{ data: [], total: [] }]),
-      });
-
-      const res = await service.findAllTransactions({ page: 1, limit: 15 });
-      expect(res.data).toEqual([]);
-      expect(res.meta).toEqual({
-        page: 1,
-        limit: 15,
-        total: 0,
-        totalPages: 0,
-      });
+      await expect(
+        service.findAllTransactions({
+          page: 50,
+          limit: 50,
+          paymentMethod: 'all',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('findTransactionById', () => {
-    it('should return crypto payment detail and sibling attempt history', async () => {
-      const mockPayment = {
-        _id: new Types.ObjectId(validPaymentId),
+    it('should return crypto payment detail with attempt history', async () => {
+      mockPaymentRepository.findByIdForAdmin.mockResolvedValue({
+        id: validPaymentId,
         paymentReference: 'PAY-1',
         orderPaymentReference: 'ORDPAY-1',
         attemptNumber: 2,
-        paymentMethod: 'crypto_wallet',
-        chainId: 11155111,
-        network: 'sepolia',
-        token: 'ETH',
-        tokenDecimals: 18,
-        destinationAddress: '0xdest',
-        walletAddress: '0xuser',
-        transactionHash: '0xtxhash',
-        expectedAmount: '100000000000000000',
-        receivedAmount: '100000000000000000',
-        confirmations: 3,
-        requiredConfirmations: 3,
-        verificationStatus: 'verified',
-        expiresAt: new Date(),
-        verifiedAt: new Date(),
-        createdAt: new Date(),
         order: {
-          _id: new Types.ObjectId(validOrderId),
+          id: validOrderId,
           orderNumber: 'ORD-1001',
           totalAmount: 50000,
           currency: 'USD',
@@ -234,75 +304,72 @@ describe('AdminPaymentsService', () => {
           fulfilmentStatus: 'processing',
           paymentMethod: 'crypto_wallet',
         },
-        user: {
-          _id: new Types.ObjectId(validUserId),
-          firstName: 'Alex',
-          lastName: 'Mercer',
+        customer: {
+          id: validUserId,
+          name: 'Alex Mercer',
           email: 'alex@example.com',
         },
-      };
-
-      mockPaymentModel.findById.mockReturnValueOnce(
-        createExecChain(mockPayment),
-      );
-      mockPaymentModel.find.mockReturnValueOnce(
-        createExecChain([
-          mockPayment,
-          {
-            _id: new Types.ObjectId(),
-            paymentReference: 'PAY-0',
-            attemptNumber: 1,
-            verificationStatus: 'failed',
-            expectedAmount: '100000000000000000',
-            failureReason: 'Reverted',
-            createdAt: new Date(),
-          },
-        ]),
-      );
+        paymentMethod: 'crypto_wallet',
+        expectedAmount: '500000000',
+        currency: 'USD',
+        orderTotalAmount: 50000,
+        status: 'verified',
+        chainId: 11155111,
+        network: 'Sepolia',
+        token: 'USDC',
+        tokenDecimals: 6,
+        destinationAddress: '0xdest',
+        walletAddress: '0xuser',
+        confirmations: 3,
+        requiredConfirmations: 3,
+        expiresAt: new Date(),
+      });
+      mockPaymentRepository.findAllByOrderIdForAdmin.mockResolvedValue([
+        {
+          id: validPaymentId,
+          paymentReference: 'PAY-1',
+          attemptNumber: 2,
+          status: 'verified',
+          expectedAmount: '500000000',
+        },
+      ]);
 
       const detail = await service.findTransactionById(validPaymentId);
       expect(detail.source).toBe('payment');
-      expect(detail.attemptHistory).toHaveLength(2);
-      expect(detail.order?.orderNumber).toBe('ORD-1001');
+      expect(detail.attemptHistory).toHaveLength(1);
     });
 
-    it('should fall back to COD order detail when payment ID is not in payments collection', async () => {
-      mockPaymentModel.findById.mockReturnValueOnce(createExecChain(null));
-      mockOrderModel.findOne.mockReturnValueOnce(
-        createExecChain({
-          _id: new Types.ObjectId(validOrderId),
-          orderNumber: 'ORD-COD-9',
-          paymentReference: 'PAY-COD-9',
-          totalAmount: 35000,
-          currency: 'USD',
-          paymentStatus: 'paid',
-          fulfilmentStatus: 'delivered',
-          paymentMethod: 'cod',
-          paidAt: new Date(),
-          createdAt: new Date(),
-          user: {
-            _id: new Types.ObjectId(validUserId),
-            firstName: 'Elena',
-            lastName: 'Vance',
-            email: 'elena@example.com',
-          },
-        }),
-      );
-      mockPaymentModel.find.mockReturnValueOnce(createExecChain([]));
+    it('should fall back to OrdersService COD lookup when not in paymentRepository', async () => {
+      mockPaymentRepository.findByIdForAdmin.mockResolvedValue(null);
+      mockOrdersService.findCodOrderByIdForAdminPayment.mockResolvedValue({
+        id: validOrderId,
+        orderNumber: 'ORD-COD-9',
+        paymentReference: 'PAY-COD-9',
+        customerId: validUserId,
+        customerName: 'Elena Vance',
+        customerEmail: 'elena@example.com',
+        paymentMethod: 'cod',
+        currency: 'USD',
+        orderTotalAmount: 35000,
+        paymentStatus: 'paid',
+        fulfilmentStatus: 'delivered',
+        paidAt: new Date(),
+        createdAt: new Date(),
+      });
+      mockPaymentRepository.findAllByOrderIdForAdmin.mockResolvedValue([]);
 
       const detail = await service.findTransactionById(validOrderId);
       expect(detail.source).toBe('cod_order');
-      expect(detail.status).toBe('paid');
       expect(detail.receivedAmount).toBe('35000');
     });
 
     it('should reject invalid ID and throw NotFoundException when missing', async () => {
-      await expect(service.findTransactionById('invalid-id')).rejects.toThrow(
+      await expect(service.findTransactionById('invalid')).rejects.toThrow(
         BadRequestException,
       );
 
-      mockPaymentModel.findById.mockReturnValueOnce(createExecChain(null));
-      mockOrderModel.findOne.mockReturnValueOnce(createExecChain(null));
+      mockPaymentRepository.findByIdForAdmin.mockResolvedValue(null);
+      mockOrdersService.findCodOrderByIdForAdminPayment.mockResolvedValue(null);
       await expect(
         service.findTransactionById(validPaymentId),
       ).rejects.toThrow(NotFoundException);

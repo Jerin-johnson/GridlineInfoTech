@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersModule } from '../orders/orders.module';
-import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { ProductsModule } from '../products/products.module';
-import { User, UserSchema } from '../users/schemas/user.schema';
 import { AdminPaymentsController } from './admin-payments.controller';
 import { AdminPaymentsService } from './admin-payments.service';
 import { PAYMENT_REPOSITORY } from './constants/payment.constants';
@@ -15,11 +13,7 @@ import { BlockchainVerifierService } from './services/blockchain-verifier.servic
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Payment.name, schema: PaymentSchema },
-      { name: Order.name, schema: OrderSchema },
-      { name: User.name, schema: UserSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Payment.name, schema: PaymentSchema }]),
     OrdersModule,
     ProductsModule,
   ],

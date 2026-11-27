@@ -34,8 +34,11 @@ import { OrderQueryDto } from './dto/order-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import type { IOrderRepository } from './interfaces/order-repository.interface';
 import {
+  AdminCodPaymentFilter,
+  AdminCodPaymentRecord,
   FormattedOrder,
   FormattedOrderCustomer,
+  OrderPaymentRevenueSummary,
   PaginatedOrdersResult,
 } from './interfaces/order.interface';
 import { Order, OrderDocument, OrderItem } from './schemas/order.schema';
@@ -654,6 +657,30 @@ export class OrdersService {
     );
 
     return this.formatOrder(updatedOrder, true);
+  }
+
+  async getPaymentRevenueSummaryForAdmin(): Promise<OrderPaymentRevenueSummary> {
+    return this.orderRepository.getPaymentRevenueSummary();
+  }
+
+  async countFailedOrExpiredCodOrdersForAdmin(): Promise<number> {
+    return this.orderRepository.countFailedOrExpiredCodOrders();
+  }
+
+  async findCodOrdersForAdminPayments(
+    filter: AdminCodPaymentFilter,
+    options: { page: number; limit: number },
+  ): Promise<{ data: AdminCodPaymentRecord[]; total: number }> {
+    return this.orderRepository.findCodOrdersForAdminPayments(filter, options);
+  }
+
+  async findCodOrderByIdForAdminPayment(
+    orderId: string,
+  ): Promise<AdminCodPaymentRecord | null> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID format');
+    }
+    return this.orderRepository.findCodOrderByIdForAdminPayment(orderId);
   }
 
   private async executeWithOptionalTransaction<T>(
