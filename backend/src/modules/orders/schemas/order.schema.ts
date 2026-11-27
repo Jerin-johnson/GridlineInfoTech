@@ -179,6 +179,12 @@ export class Order {
   @Prop()
   deliveredAt?: Date;
 
+  @Prop()
+  paidAt?: Date;
+
+  @Prop({ trim: true })
+  codPaymentConfirmedBy?: string;
+
   @Prop({ trim: true })
   notes?: string;
 

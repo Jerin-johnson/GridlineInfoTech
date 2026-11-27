@@ -1,10 +1,21 @@
-import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 import { ADMIN_SETTABLE_FULFILMENT_STATUSES } from '../constants/order.constants';
 import type { FulfilmentStatus } from '../constants/order.constants';
 
 export class UpdateOrderStatusDto {
   @IsIn(ADMIN_SETTABLE_FULFILMENT_STATUSES)
   fulfilmentStatus!: FulfilmentStatus;
+
+  @IsOptional()
+  @IsBoolean({ message: 'codPaymentReceived must be a boolean' })
+  codPaymentReceived?: boolean;
 
   @IsOptional()
   @IsString()

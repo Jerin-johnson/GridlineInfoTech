@@ -10,10 +10,13 @@ const SEGMENT_LABELS: Record<string, string> = {
   products: "Products",
   inventory: "Inventory",
   categories: "Categories",
+  brands: "Brands",
   customers: "Customers",
   payments: "Payments",
   settings: "Settings",
   unauthorized: "Unauthorized",
+  new: "New",
+  edit: "Edit",
 };
 
 export function AdminBreadcrumbs() {
@@ -22,10 +25,25 @@ export function AdminBreadcrumbs() {
 
   const crumbs = segments.map((seg, idx) => {
     const href = `/${segments.slice(0, idx + 1).join("/")}`;
-    const isOrderId = segments[idx - 1] === "orders" && /^[a-f0-9]{24}$/i.test(seg);
-    const label = isOrderId
-      ? `Order #${seg.slice(-6).toUpperCase()}`
-      : SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+    const isMongoId = /^[a-f0-9]{24}$/i.test(seg);
+    const prev = segments[idx - 1];
+    let label =
+      SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+    if (isMongoId) {
+      if (prev === "orders") label = `Order #${seg.slice(-6).toUpperCase()}`;
+      else if (prev === "products")
+        label = `Product #${seg.slice(-6).toUpperCase()}`;
+      else if (prev === "brands")
+        label = `Brand #${seg.slice(-6).toUpperCase()}`;
+      else if (prev === "categories")
+        label = `Category #${seg.slice(-6).toUpperCase()}`;
+      else if (prev === "customers")
+        label = `Customer #${seg.slice(-6).toUpperCase()}`;
+    } else if (seg === "new") {
+      if (prev === "brands") label = "New Brand";
+      else if (prev === "categories") label = "New Category";
+      else if (prev === "products") label = "New Product";
+    }
     return { href, label, isLast: idx === segments.length - 1 };
   });
 

@@ -504,6 +504,33 @@ export class OrdersService {
     }
 
     if (
+      existing.paymentMethod !== 'cod' &&
+      dto.codPaymentReceived !== undefined
+    ) {
+      throw new BadRequestException(
+        'COD payment confirmation is only valid for Cash on Delivery orders',
+      );
+    }
+
+    const isCodDeliveryConfirmation =
+      existing.paymentMethod === 'cod' && dto.fulfilmentStatus === 'delivered';
+    const isUnpaidCod =
+      existing.paymentMethod === 'cod' && existing.paymentStatus !== 'paid';
+
+    if (isCodDeliveryConfirmation && isUnpaidCod) {
+      if (dto.codPaymentReceived !== true) {
+        throw new BadRequestException(
+          'COD payment must be received and explicitly confirmed before this order can be marked as delivered.',
+        );
+      }
+      if ((existing.totalAmount ?? 0) <= 0) {
+        throw new BadRequestException(
+          'Order total amount due must be greater than zero to confirm COD payment',
+        );
+      }
+    }
+
+    if (
       dto.fulfilmentStatus === 'cancelled' &&
       !CANCELLABLE_PAYMENT_STATUSES.includes(existing.paymentStatus)
     ) {
@@ -529,24 +556,53 @@ export class OrdersService {
 
     const now = new Date();
     const note = dto.note?.trim() || undefined;
-    const historyNote = note
-      ? `Status updated to ${dto.fulfilmentStatus} by admin: ${note}`
-      : `Status updated to ${dto.fulfilmentStatus} by admin`;
+    const isConfirmingCodPayment =
+      isCodDeliveryConfirmation && isUnpaidCod && dto.codPaymentReceived === true;
+    const shouldFinalizeCodStock =
+      isConfirmingCodPayment && existing.stockReserved;
+    const historyNote = isConfirmingCodPayment
+      ? note
+        ? `COD payment received and order delivered by admin: ${note}`
+        : `COD payment received and order delivered by admin`
+      : note
+        ? `Status updated to ${dto.fulfilmentStatus} by admin: ${note}`
+        : `Status updated to ${dto.fulfilmentStatus} by admin`;
     const isCancelling = dto.fulfilmentStatus === 'cancelled';
     const shouldReleaseStock = isCancelling && existing.stockReserved;
 
+    const allowedPaymentStatuses = isCancelling
+      ? CANCELLABLE_PAYMENT_STATUSES
+      : isConfirmingCodPayment
+        ? CANCELLABLE_PAYMENT_STATUSES
+        : PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus) &&
+            existing.paymentMethod !== 'cod'
+          ? (['paid'] as const)
+          : undefined;
+
     const updatedOrder = await this.executeWithOptionalTransaction(
       async (session) => {
+        if (shouldFinalizeCodStock) {
+          for (const item of existing.items) {
+            const deducted = await this.productsService.confirmStockDeduction(
+              item.product.toString(),
+              item.quantity,
+              session,
+            );
+            if (!deducted) {
+              throw new ConflictException(
+                `Unable to finalize stock for item '${item.name}' during COD delivery confirmation`,
+              );
+            }
+          }
+        }
+
         const updated = await this.orderRepository.updateAdminStatusAtomically(
           orderId,
           {
             expectedCurrentStatus: existing.fulfilmentStatus,
-            allowedPaymentStatuses: isCancelling
-              ? CANCELLABLE_PAYMENT_STATUSES
-              : PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus) &&
-                  existing.paymentMethod !== 'cod'
-                ? ['paid']
-                : undefined,
+            allowedPaymentStatuses: allowedPaymentStatuses
+              ? [...allowedPaymentStatuses]
+              : undefined,
             fulfilmentStatus: dto.fulfilmentStatus,
             shippingProvider,
             trackingNumber,
@@ -554,6 +610,14 @@ export class OrdersService {
             ...(dto.fulfilmentStatus === 'shipped' ? { shippedAt: now } : {}),
             ...(dto.fulfilmentStatus === 'delivered'
               ? { deliveredAt: now }
+              : {}),
+            ...(isConfirmingCodPayment
+              ? {
+                  paymentStatus: 'paid',
+                  paidAt: now,
+                  codPaymentConfirmedBy: adminUserId,
+                  stockReserved: false,
+                }
               : {}),
             ...(isCancelling
               ? {
@@ -755,6 +819,7 @@ export class OrdersService {
       trackingUrl: raw.trackingUrl,
       shippedAt: raw.shippedAt,
       deliveredAt: raw.deliveredAt,
+      paidAt: raw.paidAt,
       notes: raw.notes,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,

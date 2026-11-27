@@ -74,6 +74,9 @@ export interface IOrderRepository {
       trackingUrl?: string;
       shippedAt?: Date;
       deliveredAt?: Date;
+      paidAt?: Date;
+      paymentStatus?: PaymentStatus;
+      codPaymentConfirmedBy?: string;
       cancelledAt?: Date;
       cancellationReason?: string;
       stockReserved?: boolean;

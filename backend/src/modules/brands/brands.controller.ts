@@ -27,14 +27,50 @@ export class BrandsController {
   @Public()
   @Get()
   async findAll(
-    @Query('status') status?: 'active' | 'inactive',
+    @Query('status') status?: 'active' | 'inactive' | 'all',
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @CurrentUser() user?: JwtPayload | null,
   ) {
     const isAdmin = user?.role === 'admin';
-    const effectiveStatus = isAdmin && status ? status : 'active';
-    const brands = await this.brandsService.findAll({
-      status: effectiveStatus,
-    });
+    const effectiveStatus =
+      isAdmin && status === 'all'
+        ? undefined
+        : isAdmin && (status === 'active' || status === 'inactive')
+          ? status
+          : 'active';
+
+    let brands = await this.brandsService.findAll(
+      effectiveStatus ? { status: effectiveStatus } : {},
+    );
+
+    if (search?.trim()) {
+      const q = search.trim().toLowerCase();
+      brands = brands.filter(
+        (b) =>
+          b.name.toLowerCase().includes(q) || b.slug.toLowerCase().includes(q),
+      );
+    }
+
+    if (page || limit) {
+      const parsedPage = Math.max(1, Number(page) || 1);
+      const parsedLimit = Math.min(Math.max(1, Number(limit) || 10), 50);
+      const total = brands.length;
+      const start = (parsedPage - 1) * parsedLimit;
+      const paged = brands.slice(start, start + parsedLimit);
+      return {
+        message: 'Brands retrieved successfully',
+        data: paged,
+        meta: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total,
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+      };
+    }
+
     return {
       message: 'Brands retrieved successfully',
       data: brands,

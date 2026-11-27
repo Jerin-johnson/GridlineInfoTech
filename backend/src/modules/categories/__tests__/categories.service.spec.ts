@@ -198,6 +198,47 @@ describe('CategoriesService', () => {
         service.update(validObjectId, { parent: validObjectId }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw BadRequestException on circular category hierarchy', async () => {
+      const catAId = '507f1f77bcf86cd799439011';
+      const catBId = '507f1f77bcf86cd799439012';
+      const catCId = '507f1f77bcf86cd799439013';
+
+      mockCategoryRepository.findById.mockImplementation((id: string) => {
+        if (id === catAId) {
+          return Promise.resolve({
+            _id: catAId,
+            name: 'Root',
+            slug: 'root',
+            status: 'active',
+            parent: null,
+          });
+        }
+        if (id === catCId) {
+          return Promise.resolve({
+            _id: catCId,
+            name: 'Grandchild',
+            slug: 'grandchild',
+            status: 'active',
+            parent: catBId,
+          });
+        }
+        if (id === catBId) {
+          return Promise.resolve({
+            _id: catBId,
+            name: 'Child',
+            slug: 'child',
+            status: 'active',
+            parent: catAId,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await expect(
+        service.update(catAId, { parent: catCId }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('deactivate', () => {
