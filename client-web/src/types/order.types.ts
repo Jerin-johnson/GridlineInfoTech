@@ -48,11 +48,20 @@ export interface OrderStatusHistoryEntry {
   changedAt: string;
 }
 
+export interface FormattedOrderCustomer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+}
+
 export interface FormattedOrder {
   id: string;
   orderNumber: string;
   paymentReference: string;
   customerEmail: string;
+  customer?: FormattedOrderCustomer | null;
   items: OrderItem[];
   shippingAddress: OrderShippingAddress;
   subtotal: number;

@@ -41,7 +41,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Orders",
         href: "/admin/orders",
         icon: ShoppingBag,
-        enabled: false,
+        enabled: true,
       },
       {
         label: "Products",
