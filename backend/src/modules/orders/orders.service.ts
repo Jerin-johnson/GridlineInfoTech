@@ -483,7 +483,10 @@ export class OrdersService {
     }
 
     const allowedNext =
-      ALLOWED_ADMIN_FULFILMENT_TRANSITIONS[existing.fulfilmentStatus] ?? [];
+      existing.paymentMethod === 'cod' && existing.fulfilmentStatus === 'placed'
+        ? ['processing', 'cancelled']
+        : (ALLOWED_ADMIN_FULFILMENT_TRANSITIONS[existing.fulfilmentStatus] ??
+          []);
     if (!allowedNext.includes(dto.fulfilmentStatus)) {
       throw new BadRequestException(
         `Invalid fulfilment status transition from '${existing.fulfilmentStatus}' to '${dto.fulfilmentStatus}'`,
@@ -540,7 +543,8 @@ export class OrdersService {
             expectedCurrentStatus: existing.fulfilmentStatus,
             allowedPaymentStatuses: isCancelling
               ? CANCELLABLE_PAYMENT_STATUSES
-              : PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus)
+              : PAID_REQUIRED_FULFILMENT_STATUSES.includes(dto.fulfilmentStatus) &&
+                  existing.paymentMethod !== 'cod'
                 ? ['paid']
                 : undefined,
             fulfilmentStatus: dto.fulfilmentStatus,

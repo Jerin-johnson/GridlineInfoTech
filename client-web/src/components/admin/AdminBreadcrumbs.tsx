@@ -22,8 +22,10 @@ export function AdminBreadcrumbs() {
 
   const crumbs = segments.map((seg, idx) => {
     const href = `/${segments.slice(0, idx + 1).join("/")}`;
-    const label =
-      SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+    const isOrderId = segments[idx - 1] === "orders" && /^[a-f0-9]{24}$/i.test(seg);
+    const label = isOrderId
+      ? `Order #${seg.slice(-6).toUpperCase()}`
+      : SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
     return { href, label, isLast: idx === segments.length - 1 };
   });
 
