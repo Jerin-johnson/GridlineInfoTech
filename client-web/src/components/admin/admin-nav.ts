@@ -54,7 +54,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Inventory",
         href: "/admin/inventory",
         icon: Boxes,
-        enabled: false,
+        enabled: true,
       },
       {
         label: "Categories",

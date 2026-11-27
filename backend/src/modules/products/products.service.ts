@@ -5,8 +5,10 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
-import { ClientSession, FilterQuery, Types } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { ClientSession, FilterQuery, Model, Types } from 'mongoose';
 import { BrandsService } from '../brands/brands.service';
 import { CategoriesService } from '../categories/categories.service';
 import { CloudinaryService } from '../uploads/services/cloudinary.service';
@@ -15,6 +17,11 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import type { IProductRepository } from './interfaces/product-repository.interface';
+import {
+  InventoryMovement,
+  InventoryMovementDocument,
+  InventoryMovementType,
+} from './schemas/inventory-movement.schema';
 import {
   Product,
   ProductDocument,
@@ -33,6 +40,9 @@ export class ProductsService {
     private readonly categoriesService: CategoriesService,
     private readonly brandsService: BrandsService,
     private readonly cloudinaryService: CloudinaryService,
+    @Optional()
+    @InjectModel(InventoryMovement.name)
+    private readonly movementModel?: Model<InventoryMovementDocument>,
   ) {}
 
   async create(dto: CreateProductDto): Promise<FormattedProduct> {
@@ -106,6 +116,19 @@ export class ProductsService {
     };
 
     const created = await this.productRepository.create(productData);
+    if (stock > 0 && this.movementModel) {
+      await this.recordMovement({
+        productId: created._id.toString(),
+        type: 'initial_stock',
+        quantity: stock,
+        delta: stock,
+        previousStock: 0,
+        resultingStock: stock,
+        previousReservedStock: 0,
+        resultingReservedStock: reservedStock,
+        reason: 'Initial product stock on creation',
+      });
+    }
     const populated = await this.productRepository.findById(
       created._id.toString(),
     );
@@ -224,6 +247,15 @@ export class ProductsService {
           throw new ConflictException(`Product slug '${slug}' already exists`);
         }
       }
+    }
+
+    if (
+      dto.stock !== undefined &&
+      dto.stock < (existing.reservedStock ?? 0)
+    ) {
+      throw new BadRequestException(
+        `Stock cannot be reduced below reserved quantity (${existing.reservedStock ?? 0})`,
+      );
     }
 
     const updateData: Partial<Product> = {
@@ -462,7 +494,31 @@ export class ProductsService {
       throw new BadRequestException('Quantity must be a positive integer');
     }
 
-    return this.productRepository.reserveStock(productId, quantity, session);
+    const reserved = await this.productRepository.reserveStock(
+      productId,
+      quantity,
+      session,
+    );
+    if (reserved && this.movementModel) {
+      const latest = await this.productRepository.findById(productId);
+      if (latest) {
+        await this.recordMovement(
+          {
+            productId,
+            type: 'stock_reservation',
+            quantity,
+            delta: -quantity,
+            previousStock: latest.stock,
+            resultingStock: latest.stock,
+            previousReservedStock: Math.max(0, latest.reservedStock - quantity),
+            resultingReservedStock: latest.reservedStock,
+            reason: 'Stock reserved for order checkout',
+          },
+          session,
+        );
+      }
+    }
+    return reserved;
   }
 
   async releaseStock(
@@ -477,7 +533,31 @@ export class ProductsService {
       throw new BadRequestException('Quantity must be a positive integer');
     }
 
-    return this.productRepository.releaseStock(productId, quantity, session);
+    const released = await this.productRepository.releaseStock(
+      productId,
+      quantity,
+      session,
+    );
+    if (released && this.movementModel) {
+      const latest = await this.productRepository.findById(productId);
+      if (latest) {
+        await this.recordMovement(
+          {
+            productId,
+            type: 'reservation_release',
+            quantity,
+            delta: quantity,
+            previousStock: latest.stock,
+            resultingStock: latest.stock,
+            previousReservedStock: latest.reservedStock + quantity,
+            resultingReservedStock: latest.reservedStock,
+            reason: 'Reserved stock released',
+          },
+          session,
+        );
+      }
+    }
+    return released;
   }
 
   async confirmStockDeduction(
@@ -492,10 +572,63 @@ export class ProductsService {
       throw new BadRequestException('Quantity must be a positive integer');
     }
 
-    return this.productRepository.confirmStockDeduction(
+    const deducted = await this.productRepository.confirmStockDeduction(
       productId,
       quantity,
       session,
+    );
+    if (deducted && this.movementModel) {
+      const latest = await this.productRepository.findById(productId);
+      if (latest) {
+        await this.recordMovement(
+          {
+            productId,
+            type: 'order_fulfillment',
+            quantity,
+            delta: -quantity,
+            previousStock: latest.stock + quantity,
+            resultingStock: latest.stock,
+            previousReservedStock: latest.reservedStock + quantity,
+            resultingReservedStock: latest.reservedStock,
+            reason: 'Stock finalized for order fulfillment',
+          },
+          session,
+        );
+      }
+    }
+    return deducted;
+  }
+
+  private async recordMovement(
+    entry: {
+      productId: string;
+      type: InventoryMovementType;
+      quantity: number;
+      delta: number;
+      previousStock: number;
+      resultingStock: number;
+      previousReservedStock: number;
+      resultingReservedStock: number;
+      reason: string;
+    },
+    session?: ClientSession,
+  ): Promise<void> {
+    if (!this.movementModel) return;
+    await this.movementModel.create(
+      [
+        {
+          product: new Types.ObjectId(entry.productId),
+          type: entry.type,
+          quantity: entry.quantity,
+          delta: entry.delta,
+          previousStock: entry.previousStock,
+          resultingStock: entry.resultingStock,
+          previousReservedStock: entry.previousReservedStock,
+          resultingReservedStock: entry.resultingReservedStock,
+          reason: entry.reason,
+        },
+      ],
+      session ? { session } : undefined,
     );
   }
 
