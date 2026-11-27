@@ -364,12 +364,12 @@ export function Navbar({
                     </div>
                     <div className="py-1">
                       <Link
-                        href="/shop"
+                        href="/profile"
                         role="menuitem"
                         onClick={() => setAccountMenuOpen(false)}
                         className="block px-4 py-2.5 text-xs text-zinc-300 hover:bg-[#141417] hover:text-[#F5F5F3] transition-colors"
                       >
-                        Browse Catalogue
+                        Profile
                       </Link>
                       <button
                         type="button"
