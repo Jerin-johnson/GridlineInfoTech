@@ -87,15 +87,15 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
     ],
   },
-  {
-    section: "SYSTEM",
-    items: [
-      {
-        label: "Settings",
-        href: "/admin/settings",
-        icon: Settings,
-        enabled: false,
-      },
-    ],
-  },
+  // {
+  //   section: "SYSTEM",
+  //   items: [
+  //     {
+  //       label: "Settings",
+  //       href: "/admin/settings",
+  //       icon: Settings,
+  //       enabled: false,
+  //     },
+  //   ],
+  // },
 ];
