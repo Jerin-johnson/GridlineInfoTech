@@ -249,10 +249,7 @@ export class ProductsService {
       }
     }
 
-    if (
-      dto.stock !== undefined &&
-      dto.stock < (existing.reservedStock ?? 0)
-    ) {
+    if (dto.stock !== undefined && dto.stock < (existing.reservedStock ?? 0)) {
       throw new BadRequestException(
         `Stock cannot be reduced below reserved quantity (${existing.reservedStock ?? 0})`,
       );

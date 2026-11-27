@@ -235,9 +235,9 @@ describe('CategoriesService', () => {
         return Promise.resolve(null);
       });
 
-      await expect(
-        service.update(catAId, { parent: catCId }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update(catAId, { parent: catCId })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

@@ -287,7 +287,7 @@ export class PaymentsService {
       order.paymentStatus === 'expired' ||
       Boolean(
         order.paymentExpiresAt &&
-          new Date(order.paymentExpiresAt).getTime() <= Date.now(),
+        new Date(order.paymentExpiresAt).getTime() <= Date.now(),
       );
 
     const verification = await this.blockchainVerifierService.verifyTransaction(

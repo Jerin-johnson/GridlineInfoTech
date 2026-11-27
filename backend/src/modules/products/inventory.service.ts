@@ -53,7 +53,10 @@ export class InventoryService {
 
     if (query.stockStatus === 'in_stock') {
       filter.$expr = {
-        $gt: [{ $subtract: ['$stock', '$reservedStock'] }, '$lowStockThreshold'],
+        $gt: [
+          { $subtract: ['$stock', '$reservedStock'] },
+          '$lowStockThreshold',
+        ],
       };
     } else if (query.stockStatus === 'low_stock') {
       filter.$expr = {
@@ -198,7 +201,7 @@ export class InventoryService {
 
       const docMap = new Map<string, ProductDocument>();
       for (const d of docs) {
-        docMap.set(d._id.toString(), d as unknown as ProductDocument);
+        docMap.set(d._id.toString(), d);
       }
       const ordered: ProductDocument[] = [];
       for (const id of ids) {
@@ -259,11 +262,7 @@ export class InventoryService {
     }
 
     let updated = await this.productModel
-      .findOneAndUpdate(
-        atomicFilter,
-        { $inc: { stock: delta } },
-        { new: true },
-      )
+      .findOneAndUpdate(atomicFilter, { $inc: { stock: delta } }, { new: true })
       .populate('category', 'name slug')
       .populate('brand', 'name slug')
       .exec();
