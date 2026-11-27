@@ -83,7 +83,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Payments",
         href: "/admin/payments",
         icon: Wallet,
-        enabled: false,
+        enabled: true,
       },
     ],
   },
