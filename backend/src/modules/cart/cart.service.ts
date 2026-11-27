@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { ProductsService } from '../products/products.service';
 import { CART_REPOSITORY } from './constants/cart.constants';
 import { AddToCartDto } from './dto/add-to-cart.dto';
+import { MergeCartDto } from './dto/merge-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import type { ICartRepository } from './interfaces/cart-repository.interface';
 import { FormattedCart, FormattedCartItem } from './interfaces/cart.interface';
@@ -154,6 +155,81 @@ export class CartService {
       return this.formatCart(saved);
     }
     return this.formatCart(cleared);
+  }
+
+  async mergeCart(
+    userId: string,
+    dto: MergeCartDto,
+  ): Promise<{ cart: FormattedCart; warnings: string[] }> {
+    const cart = await this.getOrCreateCart(userId);
+    const warnings: string[] = [];
+
+    if (!dto.items || dto.items.length === 0) {
+      return { cart: await this.formatCart(cart), warnings };
+    }
+
+    // Deduplicate incoming guest items by productId
+    const aggregated = new Map<string, number>();
+    for (const entry of dto.items) {
+      if (!Types.ObjectId.isValid(entry.productId)) {
+        warnings.push(`Skipped invalid product ID '${entry.productId}'.`);
+        continue;
+      }
+      const qty = Math.max(1, Math.floor(entry.quantity || 1));
+      aggregated.set(
+        entry.productId,
+        (aggregated.get(entry.productId) ?? 0) + qty,
+      );
+    }
+
+    for (const [productId, incomingQty] of aggregated.entries()) {
+      try {
+        const product = await this.productsService.findById(productId);
+        const productName =
+          typeof product.name === 'string' && product.name
+            ? product.name
+            : 'Requested product';
+
+        if (product.status !== 'published' || product.availableStock <= 0) {
+          warnings.push(
+            `${productName} is currently unavailable and was not added.`,
+          );
+          continue;
+        }
+
+        const existingItem = cart.items.find(
+          (item) => item.product.toString() === productId,
+        );
+        const currentQty = existingItem ? existingItem.quantity : 0;
+        const desiredQty = currentQty + incomingQty;
+        const clampedQty = Math.min(desiredQty, product.availableStock);
+
+        if (clampedQty < desiredQty) {
+          warnings.push(
+            `Adjusted quantity for ${productName} to ${clampedQty} (maximum available stock).`,
+          );
+        }
+
+        if (existingItem) {
+          existingItem.quantity = clampedQty;
+        } else {
+          cart.items.push({
+            product: new Types.ObjectId(productId),
+            quantity: clampedQty,
+          });
+        }
+      } catch {
+        warnings.push(
+          'An item from your guest bag is no longer available and was skipped.',
+        );
+      }
+    }
+
+    const updated = await this.cartRepository.save(cart);
+    return {
+      cart: await this.formatCart(updated),
+      warnings,
+    };
   }
 
   private async getOrCreateCart(userId: string): Promise<CartDocument> {
