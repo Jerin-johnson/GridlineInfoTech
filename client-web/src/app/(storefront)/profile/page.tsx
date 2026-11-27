@@ -5,14 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddressSelector } from "@/components/checkout/AddressSelector";
 import { Navbar } from "@/components/landing/Navbar";
+import { OrderHistorySection } from "@/components/orders/OrderHistorySection";
 import { ShopFooter } from "@/components/shop/ShopFooter";
 import { getAddresses } from "@/lib/api/addresses.api";
 import { getCurrentUser } from "@/lib/api/auth.api";
-import { formatPriceCents } from "@/lib/api/catalog.api";
-import { getUserOrders } from "@/lib/api/orders.api";
 import type { UserAddress } from "@/types/address.types";
 import type { SafeUserProfile } from "@/types/auth.types";
-import type { FormattedOrder } from "@/types/order.types";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -22,7 +20,6 @@ export default function ProfilePage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null,
   );
-  const [orders, setOrders] = useState<FormattedOrder[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -34,16 +31,12 @@ export default function ProfilePage() {
           return;
         }
         setUser(profile);
-        const [addrs, ordersRes] = await Promise.all([
-          getAddresses().catch(() => []),
-          getUserOrders(1, 10).catch(() => ({ data: [] })),
-        ]);
+        const addrs = await getAddresses().catch(() => []);
         if (!active) return;
         setAddresses(addrs);
         setSelectedAddressId(
           (addrs.find((a) => a.isDefault) ?? addrs[0])?._id ?? null,
         );
-        setOrders(ordersRes.data ?? []);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -90,55 +83,7 @@ export default function ProfilePage() {
               onAddressesChange={setAddresses}
             />
 
-            <section
-              aria-labelledby="recent-orders-heading"
-              className="border border-white/10 bg-[#0D0D0F] p-6 sm:p-8 space-y-5"
-            >
-              <h2
-                id="recent-orders-heading"
-                className="font-serif text-xl sm:text-2xl font-normal text-[#F5F5F3] border-b border-white/10 pb-4"
-              >
-                Recent Orders
-              </h2>
-              {orders.length === 0 ? (
-                <p className="text-sm text-[#A1A1AA]">No orders placed yet.</p>
-              ) : (
-                <ul className="divide-y divide-white/10">
-                  {orders.map((ord) => (
-                    <li
-                      key={ord.id}
-                      className="py-4 flex flex-wrap items-center justify-between gap-4 text-sm"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-[#F5F5F3] font-medium tabular-nums">
-                          {ord.orderNumber}
-                        </p>
-                        <p className="text-xs text-[#A1A1AA] uppercase tracking-[0.14em]">
-                          {ord.fulfilmentStatus.replaceAll("_", " ")} ·{" "}
-                          {ord.paymentMethod === "cod" ? "COD" : "Crypto"} (
-                          {ord.paymentStatus})
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[#F5F5F3] tabular-nums">
-                          {formatPriceCents(ord.totalAmount, ord.currency)}
-                        </span>
-                        {ord.paymentMethod !== "cod" &&
-                          ord.paymentStatus === "pending" &&
-                          ord.fulfilmentStatus === "placed" && (
-                            <Link
-                              href={`/checkout?orderId=${encodeURIComponent(ord.id)}`}
-                              className="bg-[#C81E1E] text-[#F5F5F3] px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase"
-                            >
-                              Resume Payment
-                            </Link>
-                          )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <OrderHistorySection />
           </>
         ) : null}
       </main>
