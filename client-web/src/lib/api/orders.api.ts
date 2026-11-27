@@ -1,12 +1,16 @@
 import { apiFetch } from "@/lib/api/client";
-import type { CheckoutPayload, FormattedOrder } from "@/types/order.types";
+import type {
+  CheckoutPayload,
+  FormattedOrder,
+  OrderQueryFilters,
+} from "@/types/order.types";
 
 interface OrderResponse {
   message: string;
   data: FormattedOrder;
 }
 
-interface OrdersListResponse {
+export interface OrdersListResponse {
   message: string;
   data: FormattedOrder[];
   meta: {
@@ -39,11 +43,34 @@ export async function getOrderById(orderId: string): Promise<FormattedOrder> {
 }
 
 export async function getUserOrders(
-  page = 1,
-  limit = 10,
+  filters: OrderQueryFilters = {},
 ): Promise<OrdersListResponse> {
-  return apiFetch<OrdersListResponse>(`/orders?page=${page}&limit=${limit}`, {
+  const params = new URLSearchParams();
+  params.set("page", String(filters.page ?? 1));
+  params.set("limit", String(filters.limit ?? 10));
+  if (filters.fulfilmentStatus) {
+    params.set("fulfilmentStatus", filters.fulfilmentStatus);
+  }
+  if (filters.paymentStatus) {
+    params.set("paymentStatus", filters.paymentStatus);
+  }
+
+  return apiFetch<OrdersListResponse>(`/orders?${params.toString()}`, {
     method: "GET",
     cache: "no-store",
   });
+}
+
+export async function cancelUserOrder(
+  orderId: string,
+  reason?: string,
+): Promise<FormattedOrder> {
+  const res = await apiFetch<OrderResponse>(
+    `/orders/${encodeURIComponent(orderId)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify(reason?.trim() ? { reason: reason.trim() } : {}),
+    },
+  );
+  return res.data;
 }

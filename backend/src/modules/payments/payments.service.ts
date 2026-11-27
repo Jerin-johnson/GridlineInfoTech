@@ -92,12 +92,6 @@ export class PaymentsService {
       dto.orderId,
     );
 
-    if (order.paymentMethod === 'cod') {
-      throw new BadRequestException(
-        'Crypto payment is not applicable for Cash on Delivery orders',
-      );
-    }
-
     if (order.paymentStatus === 'paid') {
       throw new ConflictException('Order has already been paid');
     }
@@ -105,6 +99,15 @@ export class PaymentsService {
     if (order.fulfilmentStatus !== 'placed') {
       throw new BadRequestException(
         `Payment cannot be initiated for an order in status '${order.fulfilmentStatus}'`,
+      );
+    }
+
+    if (
+      order.paymentMethod === 'cod' &&
+      !['pending', 'failed'].includes(order.paymentStatus)
+    ) {
+      throw new BadRequestException(
+        `COD order cannot be converted to online payment in status '${order.paymentStatus}'`,
       );
     }
 
@@ -460,9 +463,15 @@ export class PaymentsService {
             allowedCurrentFulfilmentStatuses: ['placed'],
             paymentStatus: 'paid',
             fulfilmentStatus: 'payment_confirmed',
+            ...(order.paymentMethod === 'cod'
+              ? { paymentMethod: 'crypto_wallet' }
+              : {}),
             stockReserved: false,
             historyStatus: 'payment_confirmed',
-            historyNote: `Crypto payment verified on ${config.network} (tx: ${txHash})`,
+            historyNote:
+              order.paymentMethod === 'cod'
+                ? `Converted from COD and verified on ${config.network} (tx: ${txHash})`
+                : `Crypto payment verified on ${config.network} (tx: ${txHash})`,
             actor: 'system',
           },
           session,

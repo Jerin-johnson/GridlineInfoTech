@@ -134,6 +134,7 @@ export class MongoOrderRepository implements IOrderRepository {
       allowedCurrentFulfilmentStatuses: FulfilmentStatus[];
       paymentStatus: PaymentStatus;
       fulfilmentStatus?: FulfilmentStatus;
+      paymentMethod?: string;
       stockReserved?: boolean;
       historyStatus: string;
       historyNote: string;
@@ -147,6 +148,9 @@ export class MongoOrderRepository implements IOrderRepository {
     };
     if (data.fulfilmentStatus !== undefined) {
       setFields.fulfilmentStatus = data.fulfilmentStatus;
+    }
+    if (data.paymentMethod !== undefined) {
+      setFields.paymentMethod = data.paymentMethod;
     }
     if (data.stockReserved !== undefined) {
       setFields.stockReserved = data.stockReserved;

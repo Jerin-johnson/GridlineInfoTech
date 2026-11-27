@@ -66,9 +66,23 @@ export interface FormattedOrder {
   statusHistory: OrderStatusHistoryEntry[];
   stockReserved: boolean;
   paymentExpiresAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  shippingProvider?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface OrderQueryFilters {
+  page?: number;
+  limit?: number;
+  fulfilmentStatus?: OrderFulfilmentStatus;
+  paymentStatus?: OrderPaymentStatus;
 }
 
 export interface CheckoutPayload {

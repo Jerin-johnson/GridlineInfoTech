@@ -137,11 +137,11 @@ export function OrderConfirmationView({
 
         <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-white/10">
           <Link
-            href="/profile"
+            href={`/profile/orders/${order.id}`}
             className="inline-flex items-center gap-2 bg-[#F5F5F3] text-[#080808] px-6 py-3 text-[11px] tracking-[0.22em] uppercase font-medium hover:bg-white transition-colors min-h-[44px]"
           >
             <Package className="w-4 h-4" aria-hidden="true" />
-            View Orders & Profile
+            View Order Details
           </Link>
           <Link
             href="/shop"
