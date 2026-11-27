@@ -12,6 +12,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
+import { MergeCartDto } from './dto/merge-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 @Controller('cart')
@@ -34,6 +35,19 @@ export class CartController {
     return {
       message: 'Item added to cart successfully',
       data: cart,
+    };
+  }
+
+  @Post('merge')
+  @HttpCode(HttpStatus.OK)
+  async mergeCart(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: MergeCartDto,
+  ) {
+    const result = await this.cartService.mergeCart(userId, dto);
+    return {
+      message: 'Cart merged successfully',
+      data: result,
     };
   }
 

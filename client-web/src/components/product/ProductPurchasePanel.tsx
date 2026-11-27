@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Minus, Plus, Check, AlertCircle, ShoppingBag } from "lucide-react";
-import { addToCart } from "@/lib/api/cart.api";
 import { ApiError } from "@/lib/api/client";
 import { formatPriceCents } from "@/lib/api/catalog.api";
+import { useCartStore } from "@/store/cart.store";
 import type { CatalogProduct } from "@/types/catalog.types";
 
 interface ProductPurchasePanelProps {
@@ -61,19 +61,15 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
     setFeedback({ type: "idle" });
 
     try {
-      const updatedCart = await addToCart({
-        productId: product._id,
-        quantity: clampedQuantity,
-      });
+      await useCartStore.getState().addItem(product, clampedQuantity);
+      const totalQuantity = useCartStore.getState().totalQuantity;
       setFeedback({
         type: "success",
         message: `Added ${clampedQuantity} × ${product.name} to your bag.`,
-        totalQuantity: updatedCart.totalQuantity,
+        totalQuantity,
       });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setFeedback({ type: "auth_required" });
-      } else if (err instanceof ApiError) {
+      if (err instanceof ApiError) {
         setFeedback({ type: "error", message: err.message });
       } else {
         setFeedback({

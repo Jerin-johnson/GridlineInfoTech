@@ -20,9 +20,42 @@ interface NestErrorPayload {
   statusCode?: number;
 }
 
+const AUTH_NO_REFRESH_PATHS = new Set([
+  "/auth/login",
+  "/auth/register",
+  "/auth/google",
+  "/auth/refresh",
+  "/auth/logout",
+]);
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshSessionOnce(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+      credentials: "include",
+    })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
+  hasRetried = false,
 ): Promise<T> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${API_BASE_URL}${normalizedPath}`;
@@ -48,6 +81,18 @@ export async function apiFetch<T>(
       "Unable to reach the server. Please check your connection and try again.",
       0,
     );
+  }
+
+  if (
+    response.status === 401 &&
+    !hasRetried &&
+    typeof window !== "undefined" &&
+    !AUTH_NO_REFRESH_PATHS.has(normalizedPath)
+  ) {
+    const refreshed = await refreshSessionOnce();
+    if (refreshed) {
+      return apiFetch<T>(path, options, true);
+    }
   }
 
   const contentType = response.headers.get("content-type") || "";

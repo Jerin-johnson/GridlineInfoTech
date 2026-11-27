@@ -139,6 +139,15 @@ export async function getProductBySlug(slug: string): Promise<CatalogProduct> {
   return res.data;
 }
 
+export async function getProductById(id: string): Promise<CatalogProduct> {
+  const encoded = encodeURIComponent(id.trim());
+  const res = await apiFetch<SingleProductResponse>(`/products/${encoded}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return res.data;
+}
+
 export async function getRelatedProducts(
   idOrSlug: string,
   limit = 4,
