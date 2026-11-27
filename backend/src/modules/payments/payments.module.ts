@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersModule } from '../orders/orders.module';
 import { ProductsModule } from '../products/products.module';
+import { AdminPaymentsController } from './admin-payments.controller';
+import { AdminPaymentsService } from './admin-payments.service';
 import { PAYMENT_REPOSITORY } from './constants/payment.constants';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -15,9 +17,10 @@ import { BlockchainVerifierService } from './services/blockchain-verifier.servic
     OrdersModule,
     ProductsModule,
   ],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, AdminPaymentsController],
   providers: [
     PaymentsService,
+    AdminPaymentsService,
     BlockchainVerifierService,
     {
       provide: PAYMENT_REPOSITORY,

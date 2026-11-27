@@ -399,7 +399,10 @@ describe('PaymentsService', () => {
 
     it('should be idempotent when verifyPayment is called repeatedly for an already-paid order with the same txHash', async () => {
       mockOrdersService.findUserOrderById.mockResolvedValue(
-        makeOrder({ paymentStatus: 'paid', fulfilmentStatus: 'payment_confirmed' }),
+        makeOrder({
+          paymentStatus: 'paid',
+          fulfilmentStatus: 'payment_confirmed',
+        }),
       );
       mockPaymentRepository.findVerifiedByOrder.mockResolvedValue(
         makePaymentDoc({

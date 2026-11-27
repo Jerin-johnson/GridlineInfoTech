@@ -83,3 +83,81 @@ export interface PaginatedOrdersResult {
     totalPages: number;
   };
 }
+
+export interface OrderPaymentRevenueSummary {
+  collectedRevenue: number;
+  successfulPayments: number;
+  pendingPayments: number;
+  cryptoRevenue: number;
+  codCollected: number;
+}
+
+export interface AdminCodPaymentFilter {
+  search?: string;
+  status?:
+    | 'all'
+    | 'verified'
+    | 'paid'
+    | 'pending'
+    | 'confirming'
+    | 'failed'
+    | 'expired';
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export interface AdminCodPaymentRecord {
+  id: string;
+  orderNumber: string;
+  paymentReference: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  paymentMethod: string;
+  currency: string;
+  orderTotalAmount: number;
+  paymentStatus: PaymentStatus;
+  fulfilmentStatus: FulfilmentStatus;
+  paidAt?: Date;
+  createdAt: Date;
+}
+
+export interface DashboardSalesPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+  cryptoRevenue: number;
+  codRevenue: number;
+}
+
+export interface DashboardTopProduct {
+  productId: string;
+  name: string;
+  sku: string;
+  unitsSold: number;
+  revenue: number;
+}
+
+export interface DashboardRecentOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  totalAmount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentStatus: PaymentStatus;
+  fulfilmentStatus: FulfilmentStatus;
+  createdAt: Date;
+}
+
+export interface DashboardOrderAnalytics {
+  totalRevenue: number;
+  cryptoRevenue: number;
+  codCollected: number;
+  totalOrders: number;
+  pendingOrders: number;
+  salesOverview: DashboardSalesPoint[];
+  recentOrders: DashboardRecentOrder[];
+  topProducts: DashboardTopProduct[];
+}

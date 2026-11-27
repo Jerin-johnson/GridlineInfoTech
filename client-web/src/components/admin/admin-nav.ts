@@ -83,19 +83,19 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Payments",
         href: "/admin/payments",
         icon: Wallet,
-        enabled: false,
+        enabled: true,
       },
     ],
   },
-  {
-    section: "SYSTEM",
-    items: [
-      {
-        label: "Settings",
-        href: "/admin/settings",
-        icon: Settings,
-        enabled: false,
-      },
-    ],
-  },
+  // {
+  //   section: "SYSTEM",
+  //   items: [
+  //     {
+  //       label: "Settings",
+  //       href: "/admin/settings",
+  //       icon: Settings,
+  //       enabled: false,
+  //     },
+  //   ],
+  // },
 ];

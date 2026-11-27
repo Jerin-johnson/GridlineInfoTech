@@ -23,6 +23,11 @@ describe('OrdersService', () => {
     findAllForAdmin: jest.Mock;
     findByIdForAdmin: jest.Mock;
     updateAdminStatusAtomically: jest.Mock;
+    getPaymentRevenueSummary: jest.Mock;
+    countFailedOrExpiredCodOrders: jest.Mock;
+    findCodOrdersForAdminPayments: jest.Mock;
+    findCodOrderByIdForAdminPayment: jest.Mock;
+    getDashboardOrderAnalytics: jest.Mock;
   };
   let mockCartService: {
     getCart: jest.Mock;
@@ -142,6 +147,11 @@ describe('OrdersService', () => {
       findAllForAdmin: jest.fn(),
       findByIdForAdmin: jest.fn(),
       updateAdminStatusAtomically: jest.fn(),
+      getPaymentRevenueSummary: jest.fn(),
+      countFailedOrExpiredCodOrders: jest.fn(),
+      findCodOrdersForAdminPayments: jest.fn(),
+      findCodOrderByIdForAdminPayment: jest.fn(),
+      getDashboardOrderAnalytics: jest.fn(),
     };
 
     mockCartService = {
@@ -835,6 +845,36 @@ describe('OrdersService', () => {
           codPaymentReceived: true,
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('Admin Payment Summary & COD Queries', () => {
+    it('should delegate getPaymentRevenueSummaryForAdmin to repository', async () => {
+      mockOrderRepository.getPaymentRevenueSummary.mockResolvedValue({
+        collectedRevenue: 120000,
+        successfulPayments: 2,
+        pendingPayments: 1,
+        cryptoRevenue: 70000,
+        codCollected: 50000,
+      });
+
+      const summary = await service.getPaymentRevenueSummaryForAdmin();
+      expect(summary.collectedRevenue).toBe(120000);
+      expect(
+        mockOrderRepository.getPaymentRevenueSummary,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('should validate orderId in findCodOrderByIdForAdminPayment', async () => {
+      await expect(
+        service.findCodOrderByIdForAdminPayment('invalid-id'),
+      ).rejects.toThrow(BadRequestException);
+
+      mockOrderRepository.findCodOrderByIdForAdminPayment.mockResolvedValue(
+        null,
+      );
+      const res = await service.findCodOrderByIdForAdminPayment(orderId);
+      expect(res).toBeNull();
     });
   });
 });

@@ -3,6 +3,12 @@ import type {
   FulfilmentStatus,
   PaymentStatus,
 } from '../constants/order.constants';
+import {
+  AdminCodPaymentFilter,
+  AdminCodPaymentRecord,
+  DashboardOrderAnalytics,
+  OrderPaymentRevenueSummary,
+} from './order.interface';
 import { Order, OrderDocument } from '../schemas/order.schema';
 
 export interface OrderListFilter {
@@ -86,4 +92,17 @@ export interface IOrderRepository {
     },
     session?: ClientSession,
   ): Promise<OrderDocument | null>;
+  getPaymentRevenueSummary(): Promise<OrderPaymentRevenueSummary>;
+  countFailedOrExpiredCodOrders(): Promise<number>;
+  findCodOrdersForAdminPayments(
+    filter: AdminCodPaymentFilter,
+    options: { page: number; limit: number },
+  ): Promise<{ data: AdminCodPaymentRecord[]; total: number }>;
+  findCodOrderByIdForAdminPayment(
+    orderId: string,
+  ): Promise<AdminCodPaymentRecord | null>;
+  getDashboardOrderAnalytics(range: {
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<DashboardOrderAnalytics>;
 }

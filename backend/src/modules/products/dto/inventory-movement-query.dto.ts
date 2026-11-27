@@ -1,12 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsMongoId,
-  IsOptional,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsMongoId, IsOptional, Max, Min } from 'class-validator';
 import {
   INVENTORY_MOVEMENT_TYPES,
   type InventoryMovementType,

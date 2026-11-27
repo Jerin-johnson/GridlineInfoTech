@@ -24,7 +24,14 @@ export class AdminInventoryQueryDto {
   stockStatus?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock' = 'all';
 
   @IsOptional()
-  @IsIn(['name', 'sku', 'stock', 'reservedStock', 'availableStock', 'updatedAt'])
+  @IsIn([
+    'name',
+    'sku',
+    'stock',
+    'reservedStock',
+    'availableStock',
+    'updatedAt',
+  ])
   sortBy?:
     | 'name'
     | 'sku'

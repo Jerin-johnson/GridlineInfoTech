@@ -39,7 +39,11 @@ export class AdminCustomersService {
         .trim()
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(escaped, 'i');
-      filter.$or = [{ firstName: regex }, { lastName: regex }, { email: regex }];
+      filter.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex },
+      ];
     }
 
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
@@ -185,16 +189,14 @@ export class AdminCustomersService {
         paymentMethod: order.paymentMethod,
         totalAmount: order.totalAmount,
         currency: order.currency,
-        itemCount: order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
+        itemCount:
+          order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
         createdAt: order.createdAt,
       })),
     };
   }
 
-  async updateCustomerStatus(
-    customerId: string,
-    dto: UpdateCustomerStatusDto,
-  ) {
+  async updateCustomerStatus(customerId: string, dto: UpdateCustomerStatusDto) {
     if (!Types.ObjectId.isValid(customerId)) {
       throw new BadRequestException('Invalid customer ID format');
     }

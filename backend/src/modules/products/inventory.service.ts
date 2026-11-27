@@ -53,7 +53,10 @@ export class InventoryService {
 
     if (query.stockStatus === 'in_stock') {
       filter.$expr = {
-        $gt: [{ $subtract: ['$stock', '$reservedStock'] }, '$lowStockThreshold'],
+        $gt: [
+          { $subtract: ['$stock', '$reservedStock'] },
+          '$lowStockThreshold',
+        ],
       };
     } else if (query.stockStatus === 'low_stock') {
       filter.$expr = {
@@ -198,7 +201,7 @@ export class InventoryService {
 
       const docMap = new Map<string, ProductDocument>();
       for (const d of docs) {
-        docMap.set(d._id.toString(), d as unknown as ProductDocument);
+        docMap.set(d._id.toString(), d);
       }
       const ordered: ProductDocument[] = [];
       for (const id of ids) {
@@ -259,11 +262,7 @@ export class InventoryService {
     }
 
     let updated = await this.productModel
-      .findOneAndUpdate(
-        atomicFilter,
-        { $inc: { stock: delta } },
-        { new: true },
-      )
+      .findOneAndUpdate(atomicFilter, { $inc: { stock: delta } }, { new: true })
       .populate('category', 'name slug')
       .populate('brand', 'name slug')
       .exec();
@@ -378,6 +377,34 @@ export class InventoryService {
       ...raw,
       availableStock,
       inventoryStatus,
+    };
+  }
+
+  async getDashboardInventoryOverview(alertLimit = 6) {
+    const [lowRes, outRes, movementsRes] = await Promise.all([
+      this.getInventoryList({
+        page: 1,
+        limit: alertLimit,
+        stockStatus: 'low_stock',
+        sortBy: 'availableStock',
+        sortOrder: 'asc',
+      }),
+      this.getInventoryList({
+        page: 1,
+        limit: alertLimit,
+        stockStatus: 'out_of_stock',
+        sortBy: 'availableStock',
+        sortOrder: 'asc',
+      }),
+      this.getMovements({ page: 1, limit: 6 }),
+    ]);
+
+    const alerts = [...outRes.data, ...lowRes.data].slice(0, alertLimit);
+
+    return {
+      summary: lowRes.summary,
+      alerts,
+      recentMovements: movementsRes.data,
     };
   }
 }

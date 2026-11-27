@@ -96,7 +96,9 @@ describe('AdminCustomersService', () => {
       expect(res.data).toHaveLength(1);
       expect(res.data[0].orderCount).toBe(3);
       expect(res.data[0].totalSpending).toBe(45000);
-      expect((res.data[0] as Record<string, unknown>).passwordHash).toBeUndefined();
+      expect(
+        (res.data[0] as Record<string, unknown>).passwordHash,
+      ).toBeUndefined();
       expect(res.meta).toEqual({
         page: 1,
         limit: 15,
@@ -160,7 +162,9 @@ describe('AdminCustomersService', () => {
         },
       ];
 
-      mockUserModel.findOne.mockReturnValueOnce(createSelectChain(mockCustomer));
+      mockUserModel.findOne.mockReturnValueOnce(
+        createSelectChain(mockCustomer),
+      );
       mockOrderModel.find.mockReturnValueOnce(createSelectChain(mockOrders));
 
       const result = await service.findCustomerById(validCustomerId);
