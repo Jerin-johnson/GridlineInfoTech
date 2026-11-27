@@ -4,15 +4,15 @@ export interface CartItem {
   slug: string;
   sku: string;
   image?: string;
-  unitPrice: number; // integer cents
+  price: number; // integer cents
   quantity: number;
-  lineTotal: number; // integer cents
+  itemTotal: number; // price * quantity in cents
   availableStock: number;
-  inStock: boolean;
+  isAvailable: boolean;
 }
 
 export interface FormattedCart {
-  id: string;
+  id?: string;
   items: CartItem[];
   itemCount: number;
   totalQuantity: number;
@@ -27,3 +27,28 @@ export interface AddToCartPayload {
   productId: string;
   quantity: number;
 }
+
+export interface UpdateCartItemPayload {
+  quantity: number;
+}
+
+export interface MergeCartItemPayload {
+  productId: string;
+  quantity: number;
+}
+
+export interface MergeCartResult {
+  cart: FormattedCart;
+  warnings: string[];
+}
+
+export interface GuestCartPersistedItem {
+  productId: string;
+  quantity: number;
+  name: string;
+  slug: string;
+  sku: string;
+  image?: string;
+}
+
+export type CartMode = "guest" | "authenticated";
