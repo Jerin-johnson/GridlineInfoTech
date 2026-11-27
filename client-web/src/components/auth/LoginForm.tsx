@@ -10,6 +10,7 @@ import {
   loginUser,
 } from "@/lib/api/auth.api";
 import { ApiError } from "@/lib/api/client";
+import { useCartStore } from "@/store/cart.store";
 import { AuthField } from "./AuthField";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 import { useAuthFormAnimations } from "./useAuthAnimations";
@@ -90,10 +91,12 @@ export function LoginForm() {
 
     setIsSubmitting(true);
     try {
-      await loginUser({
+      const res = await loginUser({
         email: email.trim().toLowerCase(),
         password,
       });
+
+      await useCartStore.getState().initForUser(res.user);
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -210,8 +213,12 @@ export function LoginForm() {
       <GoogleAuthButton
         mode="login"
         disabled={isSubmitting || isSuccess}
-        onSuccess={() => {
+        onSuccess={async () => {
           setServerError(null);
+          const user = await getCurrentUser().catch(() => null);
+          if (user) {
+            await useCartStore.getState().initForUser(user);
+          }
           setIsSuccess(true);
           setTimeout(() => {
             fadeOutOnSuccess(() => {
