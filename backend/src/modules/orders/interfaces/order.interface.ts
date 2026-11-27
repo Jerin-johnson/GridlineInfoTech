@@ -121,3 +121,43 @@ export interface AdminCodPaymentRecord {
   paidAt?: Date;
   createdAt: Date;
 }
+
+export interface DashboardSalesPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+  cryptoRevenue: number;
+  codRevenue: number;
+}
+
+export interface DashboardTopProduct {
+  productId: string;
+  name: string;
+  sku: string;
+  unitsSold: number;
+  revenue: number;
+}
+
+export interface DashboardRecentOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  totalAmount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentStatus: PaymentStatus;
+  fulfilmentStatus: FulfilmentStatus;
+  createdAt: Date;
+}
+
+export interface DashboardOrderAnalytics {
+  totalRevenue: number;
+  cryptoRevenue: number;
+  codCollected: number;
+  totalOrders: number;
+  pendingOrders: number;
+  salesOverview: DashboardSalesPoint[];
+  recentOrders: DashboardRecentOrder[];
+  topProducts: DashboardTopProduct[];
+}

@@ -379,4 +379,32 @@ export class InventoryService {
       inventoryStatus,
     };
   }
+
+  async getDashboardInventoryOverview(alertLimit = 6) {
+    const [lowRes, outRes, movementsRes] = await Promise.all([
+      this.getInventoryList({
+        page: 1,
+        limit: alertLimit,
+        stockStatus: 'low_stock',
+        sortBy: 'availableStock',
+        sortOrder: 'asc',
+      }),
+      this.getInventoryList({
+        page: 1,
+        limit: alertLimit,
+        stockStatus: 'out_of_stock',
+        sortBy: 'availableStock',
+        sortOrder: 'asc',
+      }),
+      this.getMovements({ page: 1, limit: 6 }),
+    ]);
+
+    const alerts = [...outRes.data, ...lowRes.data].slice(0, alertLimit);
+
+    return {
+      summary: lowRes.summary,
+      alerts,
+      recentMovements: movementsRes.data,
+    };
+  }
 }

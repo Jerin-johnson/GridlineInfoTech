@@ -17,6 +17,10 @@ import {
 import {
   AdminCodPaymentFilter,
   AdminCodPaymentRecord,
+  DashboardOrderAnalytics,
+  DashboardRecentOrder,
+  DashboardSalesPoint,
+  DashboardTopProduct,
   OrderPaymentRevenueSummary,
 } from '../interfaces/order.interface';
 import { Order, OrderDocument } from '../schemas/order.schema';
@@ -464,6 +468,243 @@ export class MongoOrderRepository implements IOrderRepository {
       .populate('user', 'firstName lastName email')
       .exec();
     return doc ? this.mapCodOrderToPaymentRecord(doc) : null;
+  }
+
+  async getDashboardOrderAnalytics(range: {
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<DashboardOrderAnalytics> {
+    const dateMatch: Record<string, Date> = {};
+    if (range.dateFrom) dateMatch.$gte = range.dateFrom;
+    if (range.dateTo) dateMatch.$lte = range.dateTo;
+
+    const rangeFilter: FilterQuery<OrderDocument> =
+      Object.keys(dateMatch).length > 0 ? { createdAt: dateMatch } : {};
+
+    const [kpiAgg, salesOverview, topProducts, recentDocs] = await Promise.all([
+      this.orderModel
+        .aggregate<{
+          totalRevenue: number;
+          cryptoRevenue: number;
+          codCollected: number;
+          totalOrders: number;
+          pendingOrders: number;
+        }>([
+          { $match: rangeFilter },
+          {
+            $group: {
+              _id: null,
+              totalRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+              cryptoRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                        { $eq: ['$paymentMethod', 'crypto_wallet'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+              codCollected: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                        { $eq: ['$paymentMethod', 'cod'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+              totalOrders: { $sum: 1 },
+              pendingOrders: {
+                $sum: {
+                  $cond: [
+                    {
+                      $not: [
+                        {
+                          $in: [
+                            '$fulfilmentStatus',
+                            ['delivered', 'cancelled'],
+                          ],
+                        },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+        .exec(),
+      this.orderModel
+        .aggregate<DashboardSalesPoint>([
+          { $match: rangeFilter },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+              },
+              orders: { $sum: 1 },
+              revenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+              cryptoRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                        { $eq: ['$paymentMethod', 'crypto_wallet'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+              codRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$paymentStatus', 'paid'] },
+                        { $ne: ['$fulfilmentStatus', 'cancelled'] },
+                        { $eq: ['$paymentMethod', 'cod'] },
+                      ],
+                    },
+                    '$totalAmount',
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+          {
+            $project: {
+              _id: 0,
+              date: '$_id',
+              revenue: 1,
+              orders: 1,
+              cryptoRevenue: 1,
+              codRevenue: 1,
+            },
+          },
+        ])
+        .exec(),
+      this.orderModel
+        .aggregate<DashboardTopProduct>([
+          {
+            $match: {
+              ...rangeFilter,
+              paymentStatus: 'paid',
+              fulfilmentStatus: { $ne: 'cancelled' },
+            },
+          },
+          { $unwind: '$items' },
+          {
+            $group: {
+              _id: '$items.product',
+              name: { $first: '$items.name' },
+              sku: { $first: '$items.sku' },
+              unitsSold: { $sum: '$items.quantity' },
+              revenue: { $sum: '$items.lineTotal' },
+            },
+          },
+          { $sort: { unitsSold: -1, revenue: -1 } },
+          { $limit: 5 },
+          {
+            $project: {
+              _id: 0,
+              productId: { $toString: '$_id' },
+              name: 1,
+              sku: 1,
+              unitsSold: 1,
+              revenue: 1,
+            },
+          },
+        ])
+        .exec(),
+      this.orderModel
+        .find(rangeFilter)
+        .populate('user', 'firstName lastName email')
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(6)
+        .exec(),
+    ]);
+
+    const kpi = kpiAgg[0];
+    const recentOrders: DashboardRecentOrder[] = recentDocs.map((doc) => {
+      const userObj = doc.user as unknown as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      } | null;
+      const customerName = userObj?.firstName
+        ? `${userObj.firstName} ${userObj.lastName ?? ''}`.trim()
+        : doc.customerEmail;
+
+      return {
+        id: doc._id.toString(),
+        orderNumber: doc.orderNumber,
+        customerName,
+        customerEmail: userObj?.email ?? doc.customerEmail,
+        totalAmount: doc.totalAmount,
+        currency: doc.currency,
+        paymentMethod: doc.paymentMethod,
+        paymentStatus: doc.paymentStatus,
+        fulfilmentStatus: doc.fulfilmentStatus,
+        createdAt: doc.createdAt ?? new Date(),
+      };
+    });
+
+    return {
+      totalRevenue: kpi?.totalRevenue ?? 0,
+      cryptoRevenue: kpi?.cryptoRevenue ?? 0,
+      codCollected: kpi?.codCollected ?? 0,
+      totalOrders: kpi?.totalOrders ?? 0,
+      pendingOrders: kpi?.pendingOrders ?? 0,
+      salesOverview,
+      recentOrders,
+      topProducts,
+    };
   }
 
   private mapCodOrderToPaymentRecord(

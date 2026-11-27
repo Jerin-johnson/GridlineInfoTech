@@ -6,6 +6,7 @@ import type {
 import {
   AdminCodPaymentFilter,
   AdminCodPaymentRecord,
+  DashboardOrderAnalytics,
   OrderPaymentRevenueSummary,
 } from './order.interface';
 import { Order, OrderDocument } from '../schemas/order.schema';
@@ -100,4 +101,8 @@ export interface IOrderRepository {
   findCodOrderByIdForAdminPayment(
     orderId: string,
   ): Promise<AdminCodPaymentRecord | null>;
+  getDashboardOrderAnalytics(range: {
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<DashboardOrderAnalytics>;
 }

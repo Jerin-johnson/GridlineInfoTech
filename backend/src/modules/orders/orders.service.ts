@@ -36,6 +36,7 @@ import type { IOrderRepository } from './interfaces/order-repository.interface';
 import {
   AdminCodPaymentFilter,
   AdminCodPaymentRecord,
+  DashboardOrderAnalytics,
   FormattedOrder,
   FormattedOrderCustomer,
   OrderPaymentRevenueSummary,
@@ -683,6 +684,13 @@ export class OrdersService {
       throw new BadRequestException('Invalid order ID format');
     }
     return this.orderRepository.findCodOrderByIdForAdminPayment(orderId);
+  }
+
+  async getDashboardOrderAnalytics(range: {
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<DashboardOrderAnalytics> {
+    return this.orderRepository.getDashboardOrderAnalytics(range);
   }
 
   private async executeWithOptionalTransaction<T>(

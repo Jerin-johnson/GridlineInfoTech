@@ -27,6 +27,7 @@ describe('OrdersService', () => {
     countFailedOrExpiredCodOrders: jest.Mock;
     findCodOrdersForAdminPayments: jest.Mock;
     findCodOrderByIdForAdminPayment: jest.Mock;
+    getDashboardOrderAnalytics: jest.Mock;
   };
   let mockCartService: {
     getCart: jest.Mock;
@@ -150,6 +151,7 @@ describe('OrdersService', () => {
       countFailedOrExpiredCodOrders: jest.fn(),
       findCodOrdersForAdminPayments: jest.fn(),
       findCodOrderByIdForAdminPayment: jest.fn(),
+      getDashboardOrderAnalytics: jest.fn(),
     };
 
     mockCartService = {

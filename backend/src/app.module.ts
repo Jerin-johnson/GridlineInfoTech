@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { BrandsModule } from './modules/brands/brands.module';
 import { CartModule } from './modules/cart/cart.module';
@@ -26,6 +27,7 @@ import { UsersModule } from './modules/users/users.module';
     CartModule,
     OrdersModule,
     PaymentsModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
 
