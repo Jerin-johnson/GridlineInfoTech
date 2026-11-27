@@ -37,6 +37,8 @@ export function AdminBreadcrumbs() {
         label = `Brand #${seg.slice(-6).toUpperCase()}`;
       else if (prev === "categories")
         label = `Category #${seg.slice(-6).toUpperCase()}`;
+      else if (prev === "customers")
+        label = `Customer #${seg.slice(-6).toUpperCase()}`;
     } else if (seg === "new") {
       if (prev === "brands") label = "New Brand";
       else if (prev === "categories") label = "New Category";

@@ -72,7 +72,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Customers",
         href: "/admin/customers",
         icon: Users,
-        enabled: false,
+        enabled: true,
       },
     ],
   },
