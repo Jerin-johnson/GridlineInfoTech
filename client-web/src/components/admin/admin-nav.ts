@@ -47,7 +47,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "Products",
         href: "/admin/products",
         icon: Package,
-        enabled: false,
+        enabled: true,
       },
       {
         label: "Inventory",

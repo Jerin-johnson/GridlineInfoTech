@@ -14,6 +14,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   payments: "Payments",
   settings: "Settings",
   unauthorized: "Unauthorized",
+  new: "New Product",
+  edit: "Edit",
 };
 
 export function AdminBreadcrumbs() {
@@ -22,10 +24,14 @@ export function AdminBreadcrumbs() {
 
   const crumbs = segments.map((seg, idx) => {
     const href = `/${segments.slice(0, idx + 1).join("/")}`;
-    const isOrderId = segments[idx - 1] === "orders" && /^[a-f0-9]{24}$/i.test(seg);
-    const label = isOrderId
-      ? `Order #${seg.slice(-6).toUpperCase()}`
-      : SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+    const isMongoId = /^[a-f0-9]{24}$/i.test(seg);
+    const prev = segments[idx - 1];
+    const label =
+      prev === "orders" && isMongoId
+        ? `Order #${seg.slice(-6).toUpperCase()}`
+        : prev === "products" && isMongoId
+          ? `Product #${seg.slice(-6).toUpperCase()}`
+          : SEGMENT_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
     return { href, label, isLast: idx === segments.length - 1 };
   });
 
