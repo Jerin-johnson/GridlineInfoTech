@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -16,6 +17,7 @@ import {
   canPayOrderOnline,
   formatFulfilmentLabel,
   formatPaymentStatusLabel,
+  getEffectivePaymentStatus,
   getFulfilmentToneClass,
   getPayOnlineActionLabel,
   getPaymentToneClass,
@@ -292,6 +294,9 @@ export function OrderHistorySection() {
         <div className="space-y-4">
           {orders.map((ord) => {
             const itemCount = ord.items.reduce((sum, i) => sum + i.quantity, 0);
+            const previewItems = ord.items.slice(0, 3);
+            const overflowCount = Math.max(0, ord.items.length - 3);
+            const effectivePaymentStatus = getEffectivePaymentStatus(ord);
             const showPayOnline = canPayOrderOnline(ord);
             const showCancel = canCancelOrder(ord);
             const isConfirming = confirmCancelId === ord.id;
@@ -299,73 +304,110 @@ export function OrderHistorySection() {
             return (
               <article
                 key={ord.id}
-                className="border border-white/10 bg-[#080808] p-5 space-y-4"
+                className="border border-white/10 bg-[#080808] p-5 sm:p-6 space-y-4 hover:border-white/20 transition-colors"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Link
-                        href={`/profile/orders/${ord.id}`}
-                        className="font-serif text-lg text-[#F5F5F3] hover:text-[#C81E1E] transition-colors tabular-nums"
-                      >
-                        {ord.orderNumber}
-                      </Link>
-                      <span
-                        className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getFulfilmentToneClass(ord.fulfilmentStatus)}`}
-                      >
-                        {formatFulfilmentLabel(ord.fulfilmentStatus)}
-                      </span>
-                      <span
-                        className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getPaymentToneClass(ord.paymentStatus)}`}
-                      >
-                        {formatPaymentStatusLabel(ord.paymentStatus)}
-                      </span>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                  <div className="flex items-start gap-4 min-w-0">
+                    {/* Compact Product Thumbnails (from order summary snapshot — zero N+1) */}
+                    <div className="flex items-center -space-x-2 shrink-0 pt-0.5">
+                      {previewItems.map((item) => (
+                        <div
+                          key={item.productId}
+                          className="relative w-12 h-10 border border-white/15 bg-[#141417] overflow-hidden"
+                        >
+                          {item.image ? (
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              unoptimized
+                              sizes="48px"
+                              className="object-contain p-0.5"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[8px] tracking-[0.12em] text-[#A1A1AA]">
+                              APEX
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {overflowCount > 0 && (
+                        <div className="w-10 h-10 border border-white/15 bg-[#141417] flex items-center justify-center text-[10px] text-[#A1A1AA] tabular-nums">
+                          +{overflowCount}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-[#A1A1AA] tabular-nums">
-                      {ord.createdAt
-                        ? new Date(ord.createdAt).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "Recent"}{" "}
-                      · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
-                      {ord.paymentMethod === "cod"
-                        ? "Cash on Delivery"
-                        : "Crypto Wallet"}
-                    </p>
+
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <Link
+                          href={`/profile/orders/${ord.id}`}
+                          className="font-serif text-lg sm:text-xl text-[#F5F5F3] hover:text-[#C81E1E] transition-colors tabular-nums"
+                        >
+                          {ord.orderNumber}
+                        </Link>
+                        <span
+                          className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getFulfilmentToneClass(ord.fulfilmentStatus)}`}
+                        >
+                          {formatFulfilmentLabel(ord.fulfilmentStatus)}
+                        </span>
+                        <span
+                          className={`border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase ${getPaymentToneClass(effectivePaymentStatus)}`}
+                        >
+                          {formatPaymentStatusLabel(effectivePaymentStatus)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#A1A1AA] truncate">
+                        {ord.items.map((i) => `${i.name} × ${i.quantity}`).join(" · ")}
+                      </p>
+                      <p className="text-[11px] text-[#71717A] tabular-nums">
+                        {ord.createdAt
+                          ? new Date(ord.createdAt).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "Recent"}{" "}
+                        · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
+                        {ord.paymentMethod === "cod"
+                          ? "Cash on Delivery"
+                          : "Crypto Wallet"}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-base font-medium text-[#F5F5F3] tabular-nums mr-2">
+                  <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3 shrink-0">
+                    <span className="text-base sm:text-lg font-medium text-[#F5F5F3] tabular-nums mr-1">
                       {formatPriceCents(ord.totalAmount, ord.currency)}
                     </span>
 
-                    <Link
-                      href={`/profile/orders/${ord.id}`}
-                      className="border border-white/15 bg-[#141417] px-4 py-2 text-[10px] tracking-[0.18em] uppercase text-[#F5F5F3] hover:border-white/40 transition-colors min-h-[40px] inline-flex items-center"
-                    >
-                      View Details
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {showPayOnline && (
+                        <Link
+                          href={`/profile/orders/${ord.id}?pay=1`}
+                          className="bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-4 py-2 text-[10px] tracking-[0.18em] uppercase font-medium transition-colors min-h-[40px] inline-flex items-center"
+                        >
+                          {getPayOnlineActionLabel(ord)}
+                        </Link>
+                      )}
 
-                    {showPayOnline && (
                       <Link
-                        href={`/profile/orders/${ord.id}?pay=1`}
-                        className="bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-4 py-2 text-[10px] tracking-[0.18em] uppercase font-medium transition-colors min-h-[40px] inline-flex items-center"
+                        href={`/profile/orders/${ord.id}`}
+                        className="border border-white/15 bg-[#141417] px-4 py-2 text-[10px] tracking-[0.18em] uppercase text-[#F5F5F3] hover:border-white/40 transition-colors min-h-[40px] inline-flex items-center"
                       >
-                        {getPayOnlineActionLabel(ord)}
+                        View Details
                       </Link>
-                    )}
 
-                    {showCancel && !isConfirming && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmCancelId(ord.id)}
-                        className="border border-white/15 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] hover:text-[#C81E1E] hover:border-[#C81E1E]/60 transition-colors cursor-pointer min-h-[40px]"
-                      >
-                        Cancel
-                      </button>
-                    )}
+                      {showCancel && !isConfirming && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmCancelId(ord.id)}
+                          className="border border-white/15 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] hover:text-[#C81E1E] hover:border-[#C81E1E]/60 transition-colors cursor-pointer min-h-[40px]"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

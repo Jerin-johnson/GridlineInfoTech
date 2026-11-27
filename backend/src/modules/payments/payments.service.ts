@@ -132,6 +132,16 @@ export class PaymentsService {
 
     if (
       latestPayment &&
+      (latestPayment.verificationStatus === 'pending' ||
+        latestPayment.verificationStatus === 'confirming') &&
+      latestPayment.transactionHash
+    ) {
+      // Unresolved on-chain transaction exists; return it for reconciliation instead of creating a new attempt
+      return this.formatPayment(latestPayment);
+    }
+
+    if (
+      latestPayment &&
       latestPayment.verificationStatus === 'pending' &&
       !latestPayment.transactionHash
     ) {

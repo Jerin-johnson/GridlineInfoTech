@@ -396,5 +396,122 @@ describe('PaymentsService', () => {
 
       expect(mockProductsService.confirmStockDeduction).not.toHaveBeenCalled();
     });
+
+    it('should be idempotent when verifyPayment is called repeatedly for an already-paid order with the same txHash', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(
+        makeOrder({ paymentStatus: 'paid', fulfilmentStatus: 'payment_confirmed' }),
+      );
+      mockPaymentRepository.findVerifiedByOrder.mockResolvedValue(
+        makePaymentDoc({
+          verificationStatus: 'verified',
+          transactionHash: txHash,
+          confirmations: 3,
+        }),
+      );
+
+      const res = await service.verifyPayment(userId, {
+        orderId,
+        transactionHash: txHash,
+        walletAddress,
+        chainId: 11155111,
+      });
+
+      expect(res.verificationStatus).toBe('verified');
+      expect(mockVerifier.verifyTransaction).not.toHaveBeenCalled();
+      expect(mockOrdersService.updateOrderPaymentState).not.toHaveBeenCalled();
+      expect(mockProductsService.confirmStockDeduction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('attempt safety and COD conversion', () => {
+    it('should reuse an existing confirming attempt with txHash instead of creating a new attempt', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(makeOrder());
+      const confirmingAttempt = makePaymentDoc({
+        attemptNumber: 1,
+        verificationStatus: 'confirming',
+        transactionHash: txHash,
+        confirmations: 1,
+      });
+      mockPaymentRepository.findLatestByOrderAndUser.mockResolvedValue(
+        confirmingAttempt,
+      );
+
+      const res = await service.initiatePayment(userId, {
+        orderId,
+        walletAddress,
+        chainId: 11155111,
+      });
+
+      expect(res.attemptNumber).toBe(1);
+      expect(res.verificationStatus).toBe('confirming');
+      expect(res.transactionHash).toBe(txHash);
+      expect(mockPaymentRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should create a new attempt after a terminal rejection on an eligible order', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(
+        makeOrder({ paymentStatus: 'failed' }),
+      );
+      mockPaymentRepository.findLatestByOrderAndUser.mockResolvedValue(
+        makePaymentDoc({
+          attemptNumber: 1,
+          verificationStatus: 'underpaid',
+          transactionHash: txHash,
+        }),
+      );
+      mockPaymentRepository.countByOrder.mockResolvedValue(1);
+      mockPaymentRepository.create.mockResolvedValue(
+        makePaymentDoc({
+          attemptNumber: 2,
+          paymentReference: 'PAY-123456-2',
+          verificationStatus: 'pending',
+        }),
+      );
+
+      const res = await service.initiatePayment(userId, {
+        orderId,
+        walletAddress,
+        chainId: 11155111,
+      });
+
+      expect(res.attemptNumber).toBe(2);
+      expect(mockPaymentRepository.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow eligible COD order conversion and update paymentMethod on verification', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(
+        makeOrder({ paymentMethod: 'cod', paymentStatus: 'pending' }),
+      );
+      mockPaymentRepository.findLatestByOrderAndUser.mockResolvedValue(null);
+      mockPaymentRepository.countByOrder.mockResolvedValue(0);
+      mockPaymentRepository.create.mockResolvedValue(
+        makePaymentDoc({ verificationStatus: 'pending' }),
+      );
+
+      const initiated = await service.initiatePayment(userId, {
+        orderId,
+        walletAddress,
+        chainId: 11155111,
+      });
+      expect(initiated.verificationStatus).toBe('pending');
+    });
+
+    it('should reject COD-to-online conversion when order is already delivered or cancelled', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(
+        makeOrder({
+          paymentMethod: 'cod',
+          fulfilmentStatus: 'delivered',
+          paymentStatus: 'pending',
+        }),
+      );
+
+      await expect(
+        service.initiatePayment(userId, {
+          orderId,
+          walletAddress,
+          chainId: 11155111,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 });

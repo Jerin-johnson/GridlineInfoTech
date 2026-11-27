@@ -24,6 +24,7 @@ import {
   canPayOrderOnline,
   formatFulfilmentLabel,
   formatPaymentStatusLabel,
+  getEffectivePaymentStatus,
   getFulfilmentToneClass,
   getPayOnlineActionLabel,
   getPaymentToneClass,
@@ -212,6 +213,7 @@ export function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     );
   }
 
+  const effectivePaymentStatus = getEffectivePaymentStatus(order);
   const eligibleToPay = canPayOrderOnline(order);
   const eligibleToCancel = canCancelOrder(order);
   const isCancelled = order.fulfilmentStatus === "cancelled";
@@ -249,9 +251,9 @@ export function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 {formatFulfilmentLabel(order.fulfilmentStatus)}
               </span>
               <span
-                className={`border px-2.5 py-1 text-[10px] tracking-[0.18em] uppercase ${getPaymentToneClass(order.paymentStatus)}`}
+                className={`border px-2.5 py-1 text-[10px] tracking-[0.18em] uppercase ${getPaymentToneClass(effectivePaymentStatus)}`}
               >
-                {formatPaymentStatusLabel(order.paymentStatus)}
+                {formatPaymentStatusLabel(effectivePaymentStatus)}
               </span>
             </div>
             {order.createdAt && (

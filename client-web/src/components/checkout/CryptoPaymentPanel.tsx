@@ -36,6 +36,9 @@ const TERMINAL_FAILED_STATUSES = new Set<PaymentVerificationStatus>([
   "failed",
 ]);
 
+const POLL_INTERVAL_MS = 4000;
+const MAX_POLL_ATTEMPTS = 30;
+
 interface CryptoPaymentPanelProps {
   order: FormattedOrder;
   config: CryptoPaymentConfig;
@@ -57,9 +60,12 @@ export function CryptoPaymentPanel({
   const [isInitiating, setIsInitiating] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [pollLimitReached, setPollLimitReached] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollAttemptsRef = useRef(0);
+  const verifyInFlightRef = useRef(false);
   const onOrderPaidRef = useRef(onOrderPaid);
 
   useEffect(() => {
@@ -83,6 +89,7 @@ export function CryptoPaymentPanel({
 
       if (latest.verificationStatus === "verified") {
         stopPolling();
+        setPollLimitReached(false);
         const refreshedOrder = await getOrderById(order.id).catch(() => order);
         onOrderPaidRef.current(refreshedOrder, latest);
         return;
@@ -90,6 +97,7 @@ export function CryptoPaymentPanel({
 
       if (TERMINAL_FAILED_STATUSES.has(latest.verificationStatus)) {
         stopPolling();
+        setPollLimitReached(false);
         setPhaseError(
           latest.failureReason ||
             `Payment verification failed (${latest.verificationStatus.replace("_", " ")}).`,
@@ -99,41 +107,83 @@ export function CryptoPaymentPanel({
     [order, stopPolling],
   );
 
-  // Poll backend while awaiting blockchain confirmations
+  // Reconcile unresolved transaction via idempotent POST /payments/verify with bounded polling
   useEffect(() => {
     if (
       !payment?.transactionHash ||
       payment.verificationStatus === "verified" ||
-      TERMINAL_FAILED_STATUSES.has(payment.verificationStatus)
+      TERMINAL_FAILED_STATUSES.has(payment.verificationStatus) ||
+      pollLimitReached
     ) {
       return;
     }
 
+    const txHash = payment.transactionHash;
+    const attemptWallet = payment.walletAddress || wallet.address || "";
+    const attemptChain = payment.chainId || config.chainId;
+    if (!attemptWallet) return;
+
     stopPolling();
-    pollTimerRef.current = setInterval(() => {
-      getPaymentByOrder(order.id)
-        .then((latest) => {
-          if (latest) {
-            void handlePaymentUpdate(latest);
-          }
-        })
-        .catch(() => {
-          // Keep polling on transient network hiccup
+    pollAttemptsRef.current = 0;
+
+    const runVerifyTick = async () => {
+      if (verifyInFlightRef.current) return;
+      if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+        stopPolling();
+        setPollLimitReached(true);
+        return;
+      }
+
+      verifyInFlightRef.current = true;
+      pollAttemptsRef.current += 1;
+
+      try {
+        const reconciled = await verifyPayment({
+          orderId: order.id,
+          transactionHash: txHash,
+          walletAddress: attemptWallet,
+          chainId: attemptChain,
         });
-    }, 4000);
+        await handlePaymentUpdate(reconciled);
+      } catch (err) {
+        // If backend returned a terminal 400 rejection, sync latest payment record and stop polling
+        if (err instanceof ApiError && err.status === 400) {
+          const latest = await getPaymentByOrder(order.id).catch(() => null);
+          if (latest) {
+            await handlePaymentUpdate(latest);
+          } else {
+            stopPolling();
+            setPhaseError(err.message);
+          }
+        }
+      } finally {
+        verifyInFlightRef.current = false;
+      }
+    };
+
+    pollTimerRef.current = setInterval(() => {
+      void runVerifyTick();
+    }, POLL_INTERVAL_MS);
 
     return () => stopPolling();
   }, [
+    config.chainId,
     handlePaymentUpdate,
     order.id,
+    payment?.chainId,
     payment?.transactionHash,
     payment?.verificationStatus,
+    payment?.walletAddress,
+    pollLimitReached,
     stopPolling,
+    wallet.address,
   ]);
 
-  // Initiate payment automatically once wallet is connected on the right chain
   const ensureInitiated = useCallback(
-    async (walletAddr: string, activeChainId: number): Promise<FormattedPayment | null> => {
+    async (
+      walletAddr: string,
+      activeChainId: number,
+    ): Promise<FormattedPayment | null> => {
       if (activeChainId !== config.chainId) return null;
       setIsInitiating(true);
       setPhaseError(null);
@@ -144,6 +194,7 @@ export function CryptoPaymentPanel({
           chainId: activeChainId,
         });
         setPayment(initiated);
+        setPollLimitReached(false);
         return initiated;
       } catch (err) {
         setPhaseError(
@@ -159,6 +210,7 @@ export function CryptoPaymentPanel({
     [config.chainId, order.id],
   );
 
+  // Auto-initiate only when no payment attempt exists yet
   useEffect(() => {
     if (
       !wallet.address ||
@@ -170,13 +222,10 @@ export function CryptoPaymentPanel({
     }
 
     let active = true;
-    const addr = wallet.address;
-    const cid = wallet.chainId;
-
     initiatePayment({
       orderId: order.id,
-      walletAddress: addr,
-      chainId: cid,
+      walletAddress: wallet.address,
+      chainId: wallet.chainId,
     })
       .then((initiated) => {
         if (active) setPayment(initiated);
@@ -194,7 +243,14 @@ export function CryptoPaymentPanel({
     return () => {
       active = false;
     };
-  }, [config.chainId, isInitiating, order.id, payment, wallet.address, wallet.chainId]);
+  }, [
+    config.chainId,
+    isInitiating,
+    order.id,
+    payment,
+    wallet.address,
+    wallet.chainId,
+  ]);
 
   const handleCopyAddress = async () => {
     const dest = payment?.destinationAddress || config.destinationAddress;
@@ -204,8 +260,10 @@ export function CryptoPaymentPanel({
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const handlePayNow = async () => {
-    if (isTransferring || isVerifying || !wallet.address) return;
+  const handlePayNow = async (forceNewAttempt = false) => {
+    if (isTransferring || isVerifying || isInitiating || !wallet.address) {
+      return;
+    }
     if (wallet.chainId !== config.chainId) {
       setPhaseError(
         `Please switch MetaMask to ${config.network} (Chain ID ${config.chainId}).`,
@@ -215,9 +273,18 @@ export function CryptoPaymentPanel({
 
     setPhaseError(null);
     let activePayment = payment;
-    if (!activePayment) {
+
+    if (!activePayment || forceNewAttempt) {
       activePayment = await ensureInitiated(wallet.address, wallet.chainId);
       if (!activePayment) return;
+      // If backend returned an unresolved confirming attempt, let polling reconcile it instead of sending a duplicate tx
+      if (
+        activePayment.transactionHash &&
+        (activePayment.verificationStatus === "confirming" ||
+          activePayment.verificationStatus === "pending")
+      ) {
+        return;
+      }
     }
 
     setIsTransferring(true);
@@ -241,6 +308,7 @@ export function CryptoPaymentPanel({
 
     setIsTransferring(false);
     setIsVerifying(true);
+    setPollLimitReached(false);
 
     try {
       const verified = await verifyPayment({
@@ -251,41 +319,76 @@ export function CryptoPaymentPanel({
       });
       await handlePaymentUpdate(verified);
     } catch (err) {
-      setPhaseError(
-        err instanceof ApiError
-          ? err.message
-          : `Transaction ${txHash} was broadcast, but verification submission failed. Click Refresh Status to retry.`,
-      );
-      setPayment((prev) =>
-        prev ? { ...prev, transactionHash: txHash } : prev,
-      );
+      if (err instanceof ApiError && err.status === 400) {
+        const latest = await getPaymentByOrder(order.id).catch(() => null);
+        if (latest) {
+          await handlePaymentUpdate(latest);
+        } else {
+          setPhaseError(err.message);
+        }
+      } else {
+        setPhaseError(
+          err instanceof ApiError
+            ? err.message
+            : `Transaction ${txHash} was broadcast, but verification timed out. Click Refresh Verification to reconcile.`,
+        );
+        setPayment((prev) =>
+          prev
+            ? {
+                ...prev,
+                transactionHash: txHash,
+                verificationStatus: "confirming",
+              }
+            : prev,
+        );
+      }
     } finally {
       setIsVerifying(false);
     }
   };
 
   const handleManualVerifyRefresh = async () => {
-    if (!payment?.transactionHash || !wallet.address || !wallet.chainId) {
+    if (verifyInFlightRef.current || isVerifying) return;
+
+    const txHash = payment?.transactionHash;
+    const attemptWallet = payment?.walletAddress || wallet.address;
+    const attemptChain = payment?.chainId || wallet.chainId || config.chainId;
+
+    if (!txHash || !attemptWallet) {
       const latest = await getPaymentByOrder(order.id).catch(() => null);
       if (latest) await handlePaymentUpdate(latest);
       return;
     }
 
+    verifyInFlightRef.current = true;
     setIsVerifying(true);
     setPhaseError(null);
+    setPollLimitReached(false);
+    pollAttemptsRef.current = 0;
+
     try {
       const latest = await verifyPayment({
         orderId: order.id,
-        transactionHash: payment.transactionHash,
-        walletAddress: wallet.address,
-        chainId: wallet.chainId,
+        transactionHash: txHash,
+        walletAddress: attemptWallet,
+        chainId: attemptChain,
       });
       await handlePaymentUpdate(latest);
     } catch (err) {
-      setPhaseError(
-        err instanceof ApiError ? err.message : "Unable to refresh status.",
-      );
+      if (err instanceof ApiError && err.status === 400) {
+        const latest = await getPaymentByOrder(order.id).catch(() => null);
+        if (latest) {
+          await handlePaymentUpdate(latest);
+        } else {
+          setPhaseError(err.message);
+        }
+      } else {
+        setPhaseError(
+          err instanceof ApiError ? err.message : "Unable to refresh status.",
+        );
+      }
     } finally {
+      verifyInFlightRef.current = false;
       setIsVerifying(false);
     }
   };
@@ -300,6 +403,9 @@ export function CryptoPaymentPanel({
     : null;
 
   const destination = payment?.destinationAddress || config.destinationAddress;
+  const isTerminalRejected = Boolean(
+    payment && TERMINAL_FAILED_STATUSES.has(payment.verificationStatus),
+  );
   const isAwaitingConfirmations =
     Boolean(payment?.transactionHash) &&
     (payment?.verificationStatus === "pending" ||
@@ -314,6 +420,7 @@ export function CryptoPaymentPanel({
         <div className="space-y-1">
           <p className="text-[10px] tracking-[0.22em] uppercase text-[#A1A1AA]">
             On-Chain Settlement · {order.orderNumber}
+            {payment ? ` · Attempt #${payment.attemptNumber}` : ""}
           </p>
           <h2
             id="crypto-payment-heading"
@@ -375,8 +482,9 @@ export function CryptoPaymentPanel({
               Incorrect Network Detected
             </p>
             <p className="text-[#A1A1AA]">
-              Switch MetaMask to <strong className="text-[#F5F5F3]">{config.network}</strong>{" "}
-              (Chain ID {config.chainId}) before sending payment.
+              Switch MetaMask to{" "}
+              <strong className="text-[#F5F5F3]">{config.network}</strong> (Chain
+              ID {config.chainId}) before sending payment.
             </p>
           </div>
           <button
@@ -451,7 +559,7 @@ export function CryptoPaymentPanel({
         )}
       </div>
 
-      {/* Pending Blockchain Confirmations */}
+      {/* Pending Blockchain Confirmations (works even if wallet disconnected after refresh) */}
       {isAwaitingConfirmations && payment && (
         <div
           role="status"
@@ -459,28 +567,41 @@ export function CryptoPaymentPanel({
         >
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 text-sm text-[#F5F5F3]">
-              <Loader2
-                className="w-4 h-4 text-[#C81E1E] animate-spin motion-reduce:animate-none"
-                aria-hidden="true"
-              />
-              <span>Awaiting On-Chain Verification</span>
+              {!pollLimitReached && (
+                <Loader2
+                  className="w-4 h-4 text-[#C81E1E] animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              )}
+              <span>
+                {pollLimitReached
+                  ? "Verification is taking longer than expected"
+                  : "Awaiting On-Chain Verification"}
+              </span>
             </div>
             <span className="text-xs text-[#A1A1AA] tabular-nums">
               {payment.confirmations} / {payment.requiredConfirmations}{" "}
               confirmations
             </span>
           </div>
+          {pollLimitReached && (
+            <p className="text-xs text-[#A1A1AA]">
+              Your transaction has been recorded. Automatic polling paused after{" "}
+              {MAX_POLL_ATTEMPTS} checks—click Refresh Verification to reconcile.
+            </p>
+          )}
           <p className="text-xs text-[#A1A1AA] break-all">
-            Tx Hash: <code className="text-[#F5F5F3]">{payment.transactionHash}</code>
+            Tx Hash:{" "}
+            <code className="text-[#F5F5F3]">{payment.transactionHash}</code>
           </p>
           <button
             type="button"
             onClick={() => void handleManualVerifyRefresh()}
             disabled={isVerifying}
-            className="inline-flex items-center gap-2 border border-white/15 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-[#F5F5F3] hover:border-white/40 cursor-pointer"
+            className="inline-flex items-center gap-2 border border-white/15 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-[#F5F5F3] hover:border-white/40 cursor-pointer min-h-[40px]"
           >
             <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
-            Refresh Status
+            {isVerifying ? "Checking..." : "Refresh Verification"}
           </button>
         </div>
       )}
@@ -499,18 +620,18 @@ export function CryptoPaymentPanel({
         </div>
       )}
 
-      {/* Primary Transfer CTA */}
+      {/* Primary Transfer / Retry CTA */}
       {!isAwaitingConfirmations && (
         <button
           type="button"
-          onClick={() => void handlePayNow()}
+          onClick={() => void handlePayNow(isTerminalRejected)}
           disabled={
             !wallet.address ||
             isWrongNetwork ||
             isInitiating ||
             isTransferring ||
             isVerifying ||
-            !payment
+            (!payment && !isTerminalRejected)
           }
           className="w-full min-h-[48px] bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-6 text-[11px] tracking-[0.22em] uppercase font-medium transition-colors cursor-pointer disabled:bg-[#141417] disabled:text-[#71717A] disabled:border disabled:border-white/10 disabled:cursor-not-allowed"
         >
@@ -518,7 +639,11 @@ export function CryptoPaymentPanel({
             ? "Confirm Transfer in MetaMask..."
             : isVerifying
               ? "Verifying Transaction..."
-              : `Pay ${formattedTokenAmount ?? ""} ${config.token} with MetaMask`}
+              : isInitiating
+                ? "Preparing Attempt..."
+                : isTerminalRejected
+                  ? `Retry Payment (New Attempt) · ${formattedTokenAmount ?? ""} ${config.token}`
+                  : `Pay ${formattedTokenAmount ?? ""} ${config.token} with MetaMask`}
         </button>
       )}
     </section>

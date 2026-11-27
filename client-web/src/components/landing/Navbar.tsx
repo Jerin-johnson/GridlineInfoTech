@@ -371,6 +371,14 @@ export function Navbar({
                       >
                         Profile
                       </Link>
+                      <Link
+                        href="/profile#orders"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2.5 text-xs text-zinc-300 hover:bg-[#141417] hover:text-[#F5F5F3] transition-colors"
+                      >
+                        My Orders
+                      </Link>
                       <button
                         type="button"
                         role="menuitem"
