@@ -122,6 +122,19 @@ export class CategoriesService {
             'Parent category not found or inactive',
           );
         }
+        // Prevent circular hierarchy by walking ancestors
+        let cursor: CategoryDocument | null = parent;
+        let depth = 0;
+        while (cursor?.parent && depth < 10) {
+          const ancestorId = cursor.parent.toString();
+          if (ancestorId === id) {
+            throw new BadRequestException(
+              'Circular category hierarchy is not allowed',
+            );
+          }
+          cursor = await this.categoryRepository.findById(ancestorId);
+          depth += 1;
+        }
         parentId = new Types.ObjectId(dto.parent);
       }
     }
