@@ -83,7 +83,6 @@ export function CryptoPaymentPanel({
 
   useEffect(() => {
     if (expiresAtMs === null) return;
-    setNowMs(Date.now());
     if (Date.now() >= expiresAtMs) return;
 
     const timer = setInterval(() => {

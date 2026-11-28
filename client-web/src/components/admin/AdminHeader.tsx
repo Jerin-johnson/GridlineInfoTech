@@ -65,7 +65,7 @@ export function AdminHeader({
       useCartStore.getState().logoutToGuest();
       setMenuOpen(false);
       setSigningOut(false);
-      router.replace("/login");
+      router.replace("/admin/login");
       router.refresh();
     }
   };
