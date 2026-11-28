@@ -1,12 +1,12 @@
 # APEX ATELIER — Crypto Payment Documentation
 
-Comprehensive, code-backed developer documentation for the **APEX ATELIER** cryptocurrency payment system on **Ethereum Sepolia (`chainId: 11155111`)** using **ERC-20 USDC** (or native ETH when `CRYPTO_TOKEN_ADDRESS` is unset and `CRYPTO_TOKEN_SYMBOL=ETH`).
+Technical documentation for the **APEX ATELIER** cryptocurrency payment system on **Ethereum Sepolia (`chainId: 11155111`)** using **ERC-20 USDC** (or native ETH when `CRYPTO_TOKEN_ADDRESS` is unset and `CRYPTO_TOKEN_SYMBOL=ETH`).
 
-> **Scope & Truthfulness**: Every file path, symbol, status enum, endpoint, and behavior in this directory reflects the **actual implementation** in `backend/` and `client-web/`. Missing production safeguards (such as background cron reconciliation, RPC failover, or rate limiting) are explicitly labeled **Not implemented** or **Partially implemented**.
+> **Scope**: Every file path, symbol, status enum, endpoint, and behavior in `docs/payments/` reflects the **actual implementation** in `backend/` and `client-web/`. Missing production safeguards are explicitly marked **Missing** or **Partially implemented**.
 
 ---
 
-## Architecture at a Glance
+## Architecture Overview
 
 ```mermaid
 flowchart TD
@@ -16,7 +16,7 @@ flowchart TD
     D --> E{Chain == Sepolia 11155111?}
     E -->|No| F[Switch Network Banner]
     E -->|Yes| G[POST /payments/initiate]
-    G --> H[Pre-Flight Checks: Gas + USDC Balance + Simulate]
+    G --> H[Pre-Flight: Gas + USDC Balance + simulateContract]
     H --> I[Wallet Signs ERC-20 transfer]
     I --> J[Broadcast to Sepolia -> txHash]
     J --> K[POST /payments/verify + 4s Polling]
@@ -30,55 +30,38 @@ flowchart TD
 
 ---
 
-## Reading Guide (Sequential Learning Index)
+## Documentation Index
 
-| # | Document | Focus |
+| # | Document | Topics Covered |
 | :--- | :--- | :--- |
-| 01 | [Architecture Overview](./01-architecture-overview.md) | End-to-end layers, module boundaries, trust model |
-| 02 | [Libraries & Dependencies](./02-libraries-and-dependencies.md) | Reown AppKit, Wagmi, Viem, React Query, NestJS, Mongoose |
-| 03 | [Crypto Payment Flow](./03-crypto-payment-flow.md) | Step-by-step walkthrough from Checkout to Finality |
-| 04 | [Checkout Integration](./04-checkout-integration.md) | `CheckoutClient`, `CryptoPaymentPanel`, COD conversion, resume |
-| 05 | [Order & Payment Lifecycle](./05-order-and-payment-lifecycle.md) | Status enums, state machines, irreversible transitions |
-| 06 | [Blockchain Transaction Fundamentals](./06-blockchain-transaction-fundamentals.md) | Gas, nonce, txHash, receipts, ERC-20 `Transfer` logs |
-| 07 | [Wallet Connection](./07-wallet-connection.md) | Reown AppKit, Wagmi, `useEvmWallet`, SSR hydration |
-| 08 | [Payment Creation](./08-payment-creation.md) | `initiatePayment`, `BigInt` math, attempt recovery |
-| 09 | [Blockchain Verification](./09-blockchain-verification.md) | Server-side JSON-RPC checks in `BlockchainVerifierService` |
-| 10 | [Confirmations & Finality](./10-confirmations-and-finality.md) | Mempool, block confirmations, 4s polling, manual refresh |
-| 11 | [Idempotency & Duplicate Prevention](./11-idempotency-and-duplicate-prevention.md) | `idempotencyKey`, `E11000` recovery, txHash replay protection |
-| 12 | [Underpayment & Overpayment Handling](./12-underpayment-overpayment-handling.md) | Exact-match `BigInt` policy, terminal rejection rules |
-| 13 | [Payment Security](./13-payment-security.md) | Threat model table, trust boundaries, private key safety |
-| 14 | [Database Models & Relations](./14-database-models-and-relations.md) | `Order` & `Payment` schemas, indexes, 1-to-many attempts |
-| 15 | [API Endpoints](./15-api-endpoints.md) | Routes, DTOs, headers, responses, error codes |
-| 16 | [Error Handling & Recovery](./16-error-handling-and-recovery.md) | User rejection, timeout, late tx reconciliation, failure matrix |
-| 17 | [Environment Configuration](./17-environment-configuration.md) | Backend & frontend env vars, Joi validation, zero-address guard |
-| 18 | [Testing Guide](./18-testing-guide.md) | Local Sepolia testing, faucets, negative cases, Jest suite |
-| 19 | [Debugging Guide](./19-debugging-guide.md) | Problem / Cause / Investigation / Solution playbook |
-| 20 | [Production Readiness](./20-production-readiness.md) | Audit checklist of Implemented vs Missing safeguards |
+| 01 | [Architecture & Dependencies](./01-architecture-and-dependencies.md) | Layered NestJS + Repository architecture, module boundaries, frontend Web3 & Axios stack, installed libraries |
+| 02 | [End-to-End Payment Flow](./02-end-to-end-payment-flow.md) | Cart → Checkout → Order → Payment → Wallet → Verification → Completion, COD conversion, API endpoints & DTOs |
+| 03 | [Wallet & Blockchain Verification](./03-wallet-and-blockchain-verification.md) | EVM fundamentals, Reown AppKit + Wagmi + Viem, pre-flight checks, `BlockchainVerifierService`, confirmations & polling |
+| 04 | [Payment State & Idempotency](./04-payment-state-and-idempotency.md) | `Order` & `Payment` schemas, indexes, status lifecycles, `BigInt` math, `E11000` recovery, `txHash` replay protection |
+| 05 | [Security, Errors & Recovery](./05-security-errors-and-recovery.md) | Threat model, underpayment/overpayment rejection, wrong network/token, expired reconciliation, RPC/wallet recovery |
+| 06 | [Testing & Production Guide](./06-testing-and-production-guide.md) | Environment variables, Jest tests, Sepolia manual testing, debugging playbook, production readiness checklist |
 
 ---
 
 ## Key Codebase Files
 
-- **Backend**:
-  - `backend/src/modules/payments/payments.controller.ts`
-  - `backend/src/modules/payments/payments.service.ts`
-  - `backend/src/modules/payments/services/blockchain-verifier.service.ts`
-  - `backend/src/modules/payments/repositories/mongo-payment.repository.ts`
-  - `backend/src/modules/payments/schemas/payment.schema.ts`
-  - `backend/src/modules/payments/dto/initiate-payment.dto.ts` & `verify-payment.dto.ts`
-  - `backend/src/modules/orders/orders.service.ts` & `schemas/order.schema.ts`
-  - `backend/src/config/config.validation.ts`
-- **Frontend**:
-  - `client-web/src/lib/web3/wallet-config.ts`
-  - `client-web/src/components/providers/Web3Provider.tsx`
-  - `client-web/src/hooks/useEvmWallet.ts`
-  - `client-web/src/components/checkout/CheckoutClient.tsx`
-  - `client-web/src/components/checkout/CryptoPaymentPanel.tsx`
-  - `client-web/src/lib/api/payments.api.ts` & `client-web/src/types/payment.types.ts`
+- **Backend (`backend/src/`)**:
+  - `modules/payments/payments.controller.ts` & `admin-payments.controller.ts`
+  - `modules/payments/payments.service.ts` & `admin-payments.service.ts`
+  - `modules/payments/services/blockchain-verifier.service.ts`
+  - `modules/payments/repositories/mongo-payment.repository.ts` & `interfaces/payment-repository.interface.ts`
+  - `modules/payments/schemas/payment.schema.ts` & `dto/` (`initiate-payment.dto.ts`, `verify-payment.dto.ts`)
+  - `modules/orders/orders.service.ts`, `repositories/mongo-order.repository.ts`, `schemas/order.schema.ts`
+  - `config/config.validation.ts`
+- **Frontend (`client-web/src/`)**:
+  - `lib/web3/wallet-config.ts` & `components/providers/Web3Provider.tsx`
+  - `hooks/useEvmWallet.ts`
+  - `components/checkout/CheckoutClient.tsx` & `CryptoPaymentPanel.tsx`
+  - `lib/api/payments.api.ts`, `lib/api/axios-instance.ts`, `lib/api/api-fetch.ts`, `types/payment.types.ts`
 
 ---
 
-## Current Implementation Summary
+## Implementation Status at a Glance
 
-- **Implemented**: Order-first checkout with atomic stock reservation, idempotent `POST /orders/checkout`, Reown AppKit + Wagmi + Viem multi-wallet UI, pre-flight balance & `simulateContract` checks, server-side JSON-RPC verification (`BlockchainVerifierService`), `BigInt` exact-match amount validation, confirmation polling, late-tx reconciliation, `E11000` concurrent `initiatePayment` recovery, and read-only Admin Payments ledger.
-- **Not Implemented (Production Gaps)**: Automated background reconciliation cron for abandoned/timed-out orders, multi-RPC provider failover, webhook/indexer ingestion, and HTTP rate limiting on `/payments/*`. See [Production Readiness](./20-production-readiness.md).
+- **Implemented**: Order-first checkout with atomic stock reservation, idempotent `POST /orders/checkout`, Reown AppKit + Wagmi + Viem multi-wallet UI, pre-flight gas/USDC/simulation checks, server-side JSON-RPC verification, `BigInt` exact-match amount validation, 4s confirmation polling, late-tx reconciliation, `E11000` concurrent `initiatePayment` recovery, and read-only `/admin/payments`.
+- **Not Implemented (Production Gaps)**: Background cron/worker for expiring abandoned orders and polling `confirming` payments, multi-RPC failover, webhook/indexer ingestion, and HTTP rate limiting (`@nestjs/throttler`).
