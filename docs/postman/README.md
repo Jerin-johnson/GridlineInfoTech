@@ -1,10 +1,10 @@
 # GridLine / APEX ATELIER — Postman API Documentation
 
-Complete Postman Collection v2.1 for the NestJS backend (`/api/v1`), verified directly against all 16 controllers and DTOs in `backend/src/`.
+Complete Postman Collection v2.1 for the NestJS backend (`/api/v1`), verified directly against all 17 controllers and DTOs in `backend/src/`.
 
 ## Files
 
-- [gridline-api.postman_collection.json](./gridline-api.postman_collection.json) — Importable Postman Collection v2.1 (63 endpoints across 15 folders).
+- [gridline-api.postman_collection.json](./gridline-api.postman_collection.json) — Importable Postman Collection v2.1 (64 endpoints across 15 folders, including `GET /api/v1/health`).
 
 ## How to Import into Postman
 

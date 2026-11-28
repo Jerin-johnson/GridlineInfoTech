@@ -97,6 +97,54 @@
       "name": "01 · Health",
       "item": [
         {
+          "name": "Health Check (Production)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Public (`@Public()`). Checks application availability and MongoDB connectivity via active `admin().ping()` (2s timeout). Returns `200 OK` when healthy or `503 Service Unavailable` when MongoDB is down. Never exposes connection strings, secrets, or stack traces.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK (Healthy)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-11-28T11:30:00.000Z\",\n  \"uptime\": 124,\n  \"checks\": {\n    \"database\": {\n      \"status\": \"up\",\n      \"responseTimeMs\": 4\n    }\n  }\n}"
+            },
+            {
+              "name": "503 Service Unavailable (Unhealthy)",
+              "status": "Service Unavailable",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"error\",\n  \"timestamp\": \"2026-11-28T11:30:00.000Z\",\n  \"uptime\": 124,\n  \"checks\": {\n    \"database\": {\n      \"status\": \"down\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Health Check (Root)",
           "request": {
             "method": "GET",
@@ -108,7 +156,7 @@
               ],
               "path": []
             },
-            "description": "Public root health endpoint (`AppController.getHello`).",
+            "description": "Public root endpoint (`AppController.getHello`).",
             "auth": {
               "type": "noauth"
             }
@@ -856,7 +904,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Get Category by ID",
@@ -885,7 +947,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Create Category (Admin)",
@@ -971,7 +1047,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Deactivate Category (Admin)",
@@ -997,7 +1087,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). Soft-deactivates the category."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -1045,7 +1149,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Brand by Slug",
@@ -1075,7 +1193,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Get Brand by ID",
@@ -1104,7 +1236,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Create Brand (Admin)",
@@ -1136,7 +1282,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Update Brand (Admin)",
@@ -1176,7 +1336,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Deactivate Brand (Admin)",
@@ -1202,7 +1376,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). Soft-deactivates the brand."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -1288,7 +1476,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Product by Slug",
@@ -1318,7 +1520,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Get Related Products",
@@ -1354,7 +1570,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Product by ID",
@@ -1383,7 +1613,21 @@
               "type": "noauth"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Create Product (Admin)",
@@ -1415,7 +1659,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Upload Product Image (Admin)",
@@ -1462,7 +1720,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `multipart/form-data` using `FileInterceptor(\"image\")`. Optional text fields: `alt`, `isPrimary`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Remove Product Image (Admin)",
@@ -1503,7 +1775,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Update Product (Admin)",
@@ -1543,7 +1829,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Archive Product (Admin)",
@@ -1569,7 +1869,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). Archives the product."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -1592,7 +1906,21 @@
             },
             "description": "Authenticated. Returns the current user cart."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Add Item to Cart",
@@ -1625,7 +1953,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Merge Guest Cart",
@@ -1658,7 +2000,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Update Cart Item Quantity",
@@ -1699,7 +2055,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Remove Cart Item",
@@ -1726,7 +2096,21 @@
             },
             "description": "Authenticated. Removes `:productId` from cart."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Clear Cart",
@@ -1744,7 +2128,21 @@
             },
             "description": "Authenticated. Empties the user cart."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource deleted successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -1833,7 +2231,21 @@
             },
             "description": "Authenticated. `OrderQueryDto`: `page`, `limit` (max 50), `fulfilmentStatus`, `paymentStatus`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Order by ID",
@@ -1859,7 +2271,21 @@
             },
             "description": "Authenticated. Returns order details owned by the current user."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Cancel Order",
@@ -1900,7 +2326,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -1974,7 +2414,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Verify Crypto Payment Transaction",
@@ -2007,7 +2461,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Get Latest Payment for Order",
@@ -2034,7 +2502,21 @@
             },
             "description": "Authenticated. Returns the latest payment attempt for `:orderId` owned by the current user."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -2073,7 +2555,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `multipart/form-data` using `FileInterceptor(\"image\")`. Optional `folder` (`gridline/brands`, `gridline/categories`, `gridline/products`; defaults to `gridline/products`)."
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -2113,7 +2609,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `AdminDashboardQueryDto`: `range` (`7d|30d|90d|all`, default `30d`), optional ISO `dateFrom`, `dateTo`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -2167,7 +2677,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `AdminCustomerQueryDto`: `page`, `limit` (max 100), `search`, `status` (`all|active|inactive`), `sortBy` (`createdAt|firstName|email|lastLoginAt`), `sortOrder` (`asc|desc`)."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Customer by ID (Admin)",
@@ -2194,7 +2718,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`)."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Update Customer Active Status (Admin)",
@@ -2236,7 +2774,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -2290,7 +2842,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `AdminInventoryQueryDto`: `page`, `limit`, `search`, `stockStatus` (`all|in_stock|low_stock|out_of_stock`), `sortBy`, `sortOrder`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Inventory Movements (Admin)",
@@ -2330,7 +2896,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `InventoryMovementQueryDto`: `page`, `limit` (max 100), `productId` (MongoId), `type` (`initial_stock|admin_adjustment|stock_reservation|reservation_release|order_fulfillment|order_cancellation`)."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Adjust Product Inventory (Admin)",
@@ -2372,7 +2952,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -2421,7 +3015,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `AdminOrderQueryDto`: `page`, `limit` (max 50), `search`, `fulfilmentStatus`, `paymentStatus`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Order by ID (Admin)",
@@ -2448,7 +3056,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`)."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Update Order Fulfilment Status (Admin)",
@@ -2490,7 +3112,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     },
@@ -2515,7 +3151,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). Returns revenue & attempt summary."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "List All Payment Transactions (Admin)",
@@ -2569,7 +3219,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). `AdminPaymentQueryDto`: `page`, `limit`, `search`, `status` (`all|verified|paid|pending|confirming|failed|expired`), `paymentMethod` (`all|crypto_wallet|cod`), `dateFrom`, `dateTo`."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": [],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Payment Transaction Detail (Admin)",
@@ -2596,7 +3260,21 @@
             },
             "description": "Admin only (`@Roles(\"admin\")`). Looks up by Payment ID or falls back to COD Order ID."
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         },
         {
           "name": "Reconcile Expired Payment (Admin)",
@@ -2638,7 +3316,21 @@
               }
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Resource created or action completed successfully\",\n  \"data\": {}\n}"
+            }
+          ]
         }
       ]
     }

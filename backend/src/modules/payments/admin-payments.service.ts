@@ -207,7 +207,9 @@ export class AdminPaymentsService {
 
     const payment = await this.paymentRepository.findById(transactionId);
     if (!payment) {
-      throw new NotFoundException(`Payment record '${transactionId}' not found`);
+      throw new NotFoundException(
+        `Payment record '${transactionId}' not found`,
+      );
     }
 
     if (payment.verificationStatus !== 'expired') {
