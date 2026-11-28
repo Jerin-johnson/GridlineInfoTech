@@ -9,7 +9,10 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: true,
+    origin: [
+      'http://localhost:3000',
+      'https://gridline-info-tech-ecommerce.vercel.app',
+    ],
     credentials: true,
   });
 

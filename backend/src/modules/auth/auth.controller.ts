@@ -121,19 +121,26 @@ export class AuthController {
     };
   }
 
-  private setTokenCookies(response: Response, authResult: AuthResult): void {
+  private getCookieOptions() {
     const isProduction =
       this.configService.get<string>('NODE_ENV') === 'production';
-    const sameSite: 'strict' | 'lax' = isProduction ? 'strict' : 'lax';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+    };
+  }
+
+  private setTokenCookies(response: Response, authResult: AuthResult): void {
+    const cookieOptions = this.getCookieOptions();
 
     response.cookie(
       AUTH_COOKIE_NAMES.ACCESS_TOKEN,
       authResult.tokens.accessToken,
       {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite,
-        path: '/',
+        ...cookieOptions,
         maxAge: authResult.tokens.accessExpiresIn,
       },
     );
@@ -142,28 +149,16 @@ export class AuthController {
       AUTH_COOKIE_NAMES.REFRESH_TOKEN,
       authResult.tokens.refreshToken,
       {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite,
-        path: '/',
+        ...cookieOptions,
         maxAge: authResult.tokens.refreshExpiresIn,
       },
     );
   }
 
   private clearTokenCookies(response: Response): void {
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const sameSite: 'strict' | 'lax' = isProduction ? 'strict' : 'lax';
+    const cookieOptions = this.getCookieOptions();
 
-    const clearOptions = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite,
-      path: '/',
-    };
-
-    response.clearCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, clearOptions);
-    response.clearCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, clearOptions);
+    response.clearCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, cookieOptions);
+    response.clearCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, cookieOptions);
   }
 }
