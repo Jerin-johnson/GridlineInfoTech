@@ -9,9 +9,8 @@ import {
   Copy,
   RefreshCw,
   Loader2,
-  ShieldAlert,
 } from "lucide-react";
-import { useEvmWallet } from "@/hooks/useEvmWallet";
+import { useEvmWallet, type WalletBalanceCheck } from "@/hooks/useEvmWallet";
 import { ApiError } from "@/lib/api/client";
 import { getOrderById } from "@/lib/api/orders.api";
 import {
@@ -52,10 +51,11 @@ export function CryptoPaymentPanel({
   initialPayment = null,
   onOrderPaid,
 }: CryptoPaymentPanelProps) {
-  const wallet = useEvmWallet();
+  const wallet = useEvmWallet(config.chainId);
   const [payment, setPayment] = useState<FormattedPayment | null>(
     initialPayment,
   );
+  const [balances, setBalances] = useState<WalletBalanceCheck | null>(null);
   const [phaseError, setPhaseError] = useState<string | null>(null);
   const [isInitiating, setIsInitiating] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -65,6 +65,7 @@ export function CryptoPaymentPanel({
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollAttemptsRef = useRef(0);
+  const initiateInFlightRef = useRef(false);
   const verifyInFlightRef = useRef(false);
   const onOrderPaidRef = useRef(onOrderPaid);
 
@@ -184,7 +185,10 @@ export function CryptoPaymentPanel({
       walletAddr: string,
       activeChainId: number,
     ): Promise<FormattedPayment | null> => {
-      if (activeChainId !== config.chainId) return null;
+      if (activeChainId !== config.chainId || initiateInFlightRef.current) {
+        return null;
+      }
+      initiateInFlightRef.current = true;
       setIsInitiating(true);
       setPhaseError(null);
       try {
@@ -204,6 +208,7 @@ export function CryptoPaymentPanel({
         );
         return null;
       } finally {
+        initiateInFlightRef.current = false;
         setIsInitiating(false);
       }
     },
@@ -216,28 +221,41 @@ export function CryptoPaymentPanel({
       !wallet.address ||
       wallet.chainId !== config.chainId ||
       payment ||
-      isInitiating
+      isInitiating ||
+      initiateInFlightRef.current
     ) {
       return;
     }
 
+    void ensureInitiated(wallet.address, wallet.chainId);
+  }, [
+    config.chainId,
+    ensureInitiated,
+    isInitiating,
+    payment,
+    wallet.address,
+    wallet.chainId,
+  ]);
+
+  // Fetch SepoliaETH and USDC balances when wallet is connected on target network
+  useEffect(() => {
+    if (!wallet.address || wallet.chainId !== config.chainId) {
+      return;
+    }
+
     let active = true;
-    initiatePayment({
-      orderId: order.id,
-      walletAddress: wallet.address,
-      chainId: wallet.chainId,
-    })
-      .then((initiated) => {
-        if (active) setPayment(initiated);
+    wallet
+      .checkBalances({
+        address: wallet.address,
+        tokenAddress: payment?.tokenAddress || config.tokenAddress,
+        tokenDecimals: config.tokenDecimals,
+        requiredUnits: payment?.expectedAmount,
       })
-      .catch((err) => {
-        if (active) {
-          setPhaseError(
-            err instanceof ApiError
-              ? err.message
-              : "Unable to prepare crypto payment.",
-          );
-        }
+      .then((res) => {
+        if (active) setBalances(res);
+      })
+      .catch(() => {
+        // Non-blocking UI balance preview
       });
 
     return () => {
@@ -245,9 +263,11 @@ export function CryptoPaymentPanel({
     };
   }, [
     config.chainId,
-    isInitiating,
-    order.id,
-    payment,
+    config.tokenAddress,
+    config.tokenDecimals,
+    payment?.expectedAmount,
+    payment?.tokenAddress,
+    wallet,
     wallet.address,
     wallet.chainId,
   ]);
@@ -266,7 +286,7 @@ export function CryptoPaymentPanel({
     }
     if (wallet.chainId !== config.chainId) {
       setPhaseError(
-        `Please switch MetaMask to ${config.network} (Chain ID ${config.chainId}).`,
+        `Please switch your wallet to ${config.network} (Chain ID ${config.chainId}).`,
       );
       return;
     }
@@ -294,14 +314,17 @@ export function CryptoPaymentPanel({
         from: wallet.address,
         to: activePayment.destinationAddress,
         amountUnits: activePayment.expectedAmount,
-        tokenAddress: activePayment.tokenAddress,
+        tokenAddress: activePayment.tokenAddress || config.tokenAddress,
+        tokenDecimals: activePayment.tokenDecimals || config.tokenDecimals,
+        tokenSymbol: activePayment.token || config.token,
+        chainId: config.chainId,
       });
     } catch (err) {
       setIsTransferring(false);
       setPhaseError(
         err instanceof Error
           ? err.message
-          : "Transaction was cancelled or failed in MetaMask.",
+          : "Transaction was cancelled or failed in wallet.",
       );
       return;
     }
@@ -433,12 +456,17 @@ export function CryptoPaymentPanel({
         {wallet.address ? (
           <div className="flex items-center gap-3 border border-white/15 bg-[#141417] px-3.5 py-2">
             <span className="w-2 h-2 bg-emerald-500" aria-hidden="true" />
+            {wallet.connectorName && (
+              <span className="text-[10px] tracking-[0.14em] uppercase text-[#A1A1AA]">
+                {wallet.connectorName}
+              </span>
+            )}
             <span className="text-xs text-[#F5F5F3] tabular-nums">
               {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
             </span>
             <button
               type="button"
-              onClick={wallet.disconnect}
+              onClick={() => void wallet.disconnect()}
               className="text-[10px] tracking-[0.18em] uppercase text-[#A1A1AA] hover:text-[#F5F5F3] cursor-pointer"
             >
               Disconnect
@@ -452,24 +480,10 @@ export function CryptoPaymentPanel({
             className="inline-flex items-center gap-2 bg-[#F5F5F3] text-[#080808] px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase font-medium hover:bg-white transition-colors cursor-pointer min-h-[44px] disabled:opacity-60"
           >
             <Wallet className="w-4 h-4" aria-hidden="true" />
-            {wallet.isConnecting ? "Connecting..." : "Connect MetaMask"}
+            {wallet.isConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         )}
       </div>
-
-      {/* Wallet Not Installed Notice */}
-      {!wallet.hasProvider && (
-        <div className="border border-white/10 bg-[#141417] p-4 flex items-start gap-3 text-xs text-[#A1A1AA]">
-          <ShieldAlert
-            className="w-4 h-4 text-[#C81E1E] shrink-0 mt-0.5"
-            aria-hidden="true"
-          />
-          <span>
-            MetaMask extension was not detected. Install MetaMask or open this
-            page in a Web3-enabled browser to complete crypto checkout.
-          </span>
-        </div>
-      )}
 
       {/* Network Mismatch Banner */}
       {isWrongNetwork && (
@@ -482,7 +496,7 @@ export function CryptoPaymentPanel({
               Incorrect Network Detected
             </p>
             <p className="text-[#A1A1AA]">
-              Switch MetaMask to{" "}
+              Switch your wallet to{" "}
               <strong className="text-[#F5F5F3]">{config.network}</strong> (Chain
               ID {config.chainId}) before sending payment.
             </p>
@@ -556,6 +570,32 @@ export function CryptoPaymentPanel({
             </span>
             . Required confirmations: {config.requiredConfirmations}.
           </p>
+        )}
+
+        {wallet.address && !isWrongNetwork && balances && (
+          <div className="pt-3 border-t border-white/10 space-y-2 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[#A1A1AA]">
+              <span>
+                Wallet {config.token}:{" "}
+                <strong className="text-[#F5F5F3] tabular-nums">
+                  {balances.tokenBalance ?? "—"} {config.token}
+                </strong>
+              </span>
+              <span>
+                Gas (SepoliaETH):{" "}
+                <strong className="text-[#F5F5F3] tabular-nums">
+                  {Number(balances.ethBalance).toFixed(4)} ETH
+                </strong>
+              </span>
+            </div>
+            {(!balances.hasGas || !balances.hasEnoughToken) && (
+              <p className="text-[11px] text-amber-400">
+                {!balances.hasGas
+                  ? "Insufficient SepoliaETH for gas fees. Fund your wallet from a Sepolia faucet before paying."
+                  : `Insufficient ${config.token} balance for this order (${formattedTokenAmount ?? ""} ${config.token} required).`}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -636,14 +676,14 @@ export function CryptoPaymentPanel({
           className="w-full min-h-[48px] bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-6 text-[11px] tracking-[0.22em] uppercase font-medium transition-colors cursor-pointer disabled:bg-[#141417] disabled:text-[#71717A] disabled:border disabled:border-white/10 disabled:cursor-not-allowed"
         >
           {isTransferring
-            ? "Confirm Transfer in MetaMask..."
+            ? "Confirm Transfer in Wallet..."
             : isVerifying
               ? "Verifying Transaction..."
               : isInitiating
                 ? "Preparing Attempt..."
                 : isTerminalRejected
                   ? `Retry Payment (New Attempt) · ${formattedTokenAmount ?? ""} ${config.token}`
-                  : `Pay ${formattedTokenAmount ?? ""} ${config.token} with MetaMask`}
+                  : `Pay ${formattedTokenAmount ?? ""} ${config.token}`}
         </button>
       )}
     </section>

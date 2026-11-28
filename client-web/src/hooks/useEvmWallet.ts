@@ -1,179 +1,177 @@
 "use client";
 
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
-import { encodeFunctionData, erc20Abi, isAddress, toHex } from "viem";
+import { useState, useCallback } from "react";
+import { useAppKit, useAppKitState } from "@reown/appkit/react";
+import {
+  encodeFunctionData,
+  erc20Abi,
+  formatUnits,
+  isAddress,
+  parseUnits,
+  zeroAddress,
+} from "viem";
+import {
+  useAccount,
+  useDisconnect,
+  usePublicClient,
+  useSendTransaction,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
+import { ensureAppKitInitialized } from "@/lib/web3/wallet-config";
 
-interface EthereumProvider {
-  isMetaMask?: boolean;
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  on?: (event: string, handler: (...args: unknown[]) => void) => void;
-  removeListener?: (
-    event: string,
-    handler: (...args: unknown[]) => void,
-  ) => void;
-}
-
-function getEthereumProvider(): EthereumProvider | null {
-  if (typeof window === "undefined") return null;
-  const win = window as unknown as { ethereum?: EthereumProvider };
-  return win.ethereum ?? null;
+export interface WalletBalanceCheck {
+  ethBalance: string;
+  tokenBalance: string | null;
+  hasGas: boolean;
+  hasEnoughToken: boolean;
 }
 
 function normalizeWalletError(err: unknown, fallback: string): string {
   if (typeof err === "object" && err !== null) {
-    const e = err as { code?: number; message?: string };
-    if (e.code === 4001) {
-      return "Request was rejected in MetaMask.";
+    const e = err as {
+      code?: number;
+      shortMessage?: string;
+      message?: string;
+    };
+    const msg = (e.shortMessage || e.message || "").toLowerCase();
+    if (
+      e.code === 4001 ||
+      msg.includes("user rejected") ||
+      msg.includes("user denied") ||
+      msg.includes("rejected the request")
+    ) {
+      return "Request was rejected in your wallet.";
     }
-    if (e.code === -32002) {
-      return "A MetaMask request is already pending. Open your wallet extension.";
+    if (e.code === -32002 || msg.includes("already pending")) {
+      return "A wallet request is already pending. Please check your wallet.";
     }
-    if (e.message) {
-      const lower = e.message.toLowerCase();
-      if (lower.includes("insufficient funds")) {
-        return "Insufficient wallet balance to cover the transfer and gas fees.";
-      }
-      return e.message;
+    if (
+      msg.includes("exceeds balance") ||
+      msg.includes("transfer amount exceeds balance")
+    ) {
+      return "Insufficient token balance in your wallet for this payment.";
     }
+    if (msg.includes("insufficient funds")) {
+      return "Insufficient SepoliaETH balance to cover gas fees.";
+    }
+    if (e.shortMessage) return e.shortMessage;
+    if (e.message) return e.message;
   }
   return fallback;
 }
 
-const emptySubscribe = () => () => {};
+export function useEvmWallet(targetChainId?: number) {
+  const {
+    address: rawAddress,
+    chainId,
+    isConnected,
+    isConnecting: isWagmiConnecting,
+    connector,
+  } = useAccount();
+  const { open } = useAppKit();
+  const { open: isModalOpen } = useAppKitState();
+  const { disconnectAsync } = useDisconnect();
+  const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient({
+    chainId: targetChainId ?? chainId,
+  });
 
-export function useEvmWallet() {
-  const hasProvider = useSyncExternalStore(
-    emptySubscribe,
-    () => Boolean(getEthereumProvider()),
-    () => false,
-  );
-  const [address, setAddress] = useState<string | null>(null);
-  const [chainId, setChainId] = useState<number | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isSwitchingChain, setIsSwitchingChain] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const provider = getEthereumProvider();
-    if (!provider) return;
+  const address =
+    rawAddress && isAddress(rawAddress) ? rawAddress.toLowerCase() : null;
 
-    let active = true;
-
-    // Read already-authorized account/chain silently without prompting
-    Promise.all([
-      provider.request({ method: "eth_accounts" }) as Promise<string[]>,
-      provider.request({ method: "eth_chainId" }) as Promise<string>,
-    ])
-      .then(([accounts, hexChain]) => {
-        if (!active) return;
-        if (accounts && accounts.length > 0 && isAddress(accounts[0])) {
-          setAddress(accounts[0].toLowerCase());
-        }
-        if (hexChain) {
-          setChainId(parseInt(hexChain, 16));
-        }
-      })
-      .catch(() => {
-        // Ignore silent probe errors
-      });
-
-    const handleAccountsChanged = (accountsArg: unknown) => {
-      const list = Array.isArray(accountsArg) ? (accountsArg as string[]) : [];
-      if (list.length > 0 && isAddress(list[0])) {
-        setAddress(list[0].toLowerCase());
-      } else {
-        setAddress(null);
-      }
-      setWalletError(null);
-    };
-
-    const handleChainChanged = (chainArg: unknown) => {
-      if (typeof chainArg === "string") {
-        setChainId(parseInt(chainArg, 16));
-      }
-      setWalletError(null);
-    };
-
-    provider.on?.("accountsChanged", handleAccountsChanged);
-    provider.on?.("chainChanged", handleChainChanged);
-
-    return () => {
-      active = false;
-      provider.removeListener?.("accountsChanged", handleAccountsChanged);
-      provider.removeListener?.("chainChanged", handleChainChanged);
-    };
-  }, []);
-
-  const connect = useCallback(async (): Promise<string | null> => {
-    const provider = getEthereumProvider();
-    if (!provider) {
-      setWalletError(
-        "MetaMask or an EVM wallet extension was not detected in this browser.",
-      );
-      return null;
-    }
-
-    setIsConnecting(true);
+  const connect = useCallback(async (): Promise<void> => {
     setWalletError(null);
     try {
-      const [accounts, hexChain] = (await Promise.all([
-        provider.request({ method: "eth_requestAccounts" }),
-        provider.request({ method: "eth_chainId" }),
-      ])) as [string[], string];
-
-      const primary = accounts?.[0];
-      if (!primary || !isAddress(primary)) {
-        throw new Error("No valid EVM account returned by wallet.");
-      }
-      const normalized = primary.toLowerCase();
-      setAddress(normalized);
-      if (hexChain) {
-        setChainId(parseInt(hexChain, 16));
-      }
-      return normalized;
+      ensureAppKitInitialized();
+      await open({ view: "Connect" });
     } catch (err) {
-      setWalletError(normalizeWalletError(err, "Failed to connect MetaMask."));
-      return null;
-    } finally {
-      setIsConnecting(false);
+      setWalletError(normalizeWalletError(err, "Unable to open wallet modal."));
     }
-  }, []);
+  }, [open]);
 
-  const disconnect = useCallback(() => {
-    setAddress(null);
+  const disconnect = useCallback(async (): Promise<void> => {
     setWalletError(null);
-  }, []);
+    try {
+      await disconnectAsync();
+    } catch (err) {
+      setWalletError(normalizeWalletError(err, "Failed to disconnect wallet."));
+    }
+  }, [disconnectAsync]);
 
   const switchNetwork = useCallback(
-    async (targetChainId: number): Promise<boolean> => {
-      const provider = getEthereumProvider();
-      if (!provider) {
-        setWalletError("Wallet extension is not available.");
+    async (nextChainId: number): Promise<boolean> => {
+      if (!isConnected) {
+        setWalletError("Connect a wallet before switching networks.");
         return false;
       }
 
-      setIsSwitchingChain(true);
       setWalletError(null);
       try {
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: toHex(targetChainId) }],
-        });
-        setChainId(targetChainId);
+        await switchChainAsync({ chainId: nextChainId });
         return true;
       } catch (err) {
         setWalletError(
           normalizeWalletError(
             err,
-            `Please switch MetaMask to chain ID ${targetChainId}.`,
+            `Please switch your wallet to chain ID ${nextChainId}.`,
           ),
         );
         return false;
-      } finally {
-        setIsSwitchingChain(false);
       }
     },
-    [],
+    [isConnected, switchChainAsync],
+  );
+
+  const checkBalances = useCallback(
+    async (params: {
+      address: string;
+      tokenAddress?: string;
+      tokenDecimals: number;
+      requiredUnits?: string;
+    }): Promise<WalletBalanceCheck | null> => {
+      if (!publicClient || !isAddress(params.address)) return null;
+
+      try {
+        const ethBalanceWei = await publicClient.getBalance({
+          address: params.address as `0x${string}`,
+        });
+
+        let tokenBalanceRaw: bigint | null = null;
+        if (params.tokenAddress && isAddress(params.tokenAddress)) {
+          tokenBalanceRaw = await publicClient.readContract({
+            address: params.tokenAddress as `0x${string}`,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [params.address as `0x${string}`],
+          });
+        }
+
+        const requiredBigInt = params.requiredUnits
+          ? BigInt(params.requiredUnits)
+          : BigInt(0);
+
+        return {
+          ethBalance: formatUnits(ethBalanceWei, 18),
+          tokenBalance:
+            tokenBalanceRaw !== null
+              ? formatUnits(tokenBalanceRaw, params.tokenDecimals)
+              : null,
+          hasGas: ethBalanceWei > BigInt(0),
+          hasEnoughToken:
+            tokenBalanceRaw !== null
+              ? tokenBalanceRaw >= requiredBigInt
+              : ethBalanceWei >= requiredBigInt,
+        };
+      } catch {
+        return null;
+      }
+    },
+    [publicClient],
   );
 
   const sendPaymentTransaction = useCallback(
@@ -182,72 +180,165 @@ export function useEvmWallet() {
       to: string;
       amountUnits: string;
       tokenAddress?: string;
+      tokenDecimals?: number;
+      tokenSymbol?: string;
+      chainId?: number;
     }): Promise<string> => {
-      const provider = getEthereumProvider();
-      if (!provider) {
-        throw new Error("MetaMask is not available.");
+      if (!isConnected || !address) {
+        throw new Error("Wallet is disconnected. Please reconnect to pay.");
       }
 
-      if (!isAddress(params.from) || !isAddress(params.to)) {
-        throw new Error("Invalid sender or destination address.");
+      if (params.chainId !== undefined && chainId !== params.chainId) {
+        throw new Error(
+          `Wrong network connected. Please switch to chain ID ${params.chainId}.`,
+        );
       }
 
-      const valueBigInt = BigInt(params.amountUnits);
-      if (valueBigInt <= BigInt(0)) {
-        throw new Error("Invalid payment amount.");
+      if (
+        !isAddress(params.from) ||
+        !isAddress(params.to) ||
+        params.from.toLowerCase() === zeroAddress ||
+        params.to.toLowerCase() === zeroAddress
+      ) {
+        throw new Error("Invalid sender or merchant destination address.");
+      }
+
+      if (params.from.toLowerCase() !== address) {
+        throw new Error(
+          "Connected wallet account changed. Please refresh the payment attempt.",
+        );
+      }
+
+      const decimals = params.tokenDecimals ?? 6;
+      const symbol = (params.tokenSymbol ?? "USDC").toUpperCase();
+      const rawBigInt = BigInt(params.amountUnits);
+      const normalizedUnits = parseUnits(
+        formatUnits(rawBigInt, decimals),
+        decimals,
+      );
+
+      if (normalizedUnits <= BigInt(0) || normalizedUnits !== rawBigInt) {
+        throw new Error("Invalid payment amount precision.");
+      }
+
+      if (symbol !== "ETH" && !params.tokenAddress) {
+        throw new Error(
+          `${symbol} token contract address is missing. Cannot send a native ETH transfer for a ${symbol} order.`,
+        );
       }
 
       if (params.tokenAddress) {
-        if (!isAddress(params.tokenAddress)) {
-          throw new Error("Invalid token contract address.");
+        if (
+          !isAddress(params.tokenAddress) ||
+          params.tokenAddress.toLowerCase() === zeroAddress
+        ) {
+          throw new Error("Invalid ERC-20 token contract address.");
         }
-        const data = encodeFunctionData({
-          abi: erc20Abi,
-          functionName: "transfer",
-          args: [params.to as `0x${string}`, valueBigInt],
-        });
 
-        const txHash = (await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              from: params.from,
-              to: params.tokenAddress,
-              data,
-              value: "0x0",
-            },
-          ],
-        })) as string;
-        return txHash;
+        const tokenContract = params.tokenAddress as `0x${string}`;
+        const recipient = params.to as `0x${string}`;
+        const sender = params.from as `0x${string}`;
+
+        // Pre-flight balance & simulation checks so MetaMask never prompts with a failing tx
+        if (publicClient) {
+          const [ethBalance, tokenBalance] = await Promise.all([
+            publicClient.getBalance({ address: sender }),
+            publicClient.readContract({
+              address: tokenContract,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [sender],
+            }),
+          ]);
+
+          if (ethBalance === BigInt(0)) {
+            throw new Error(
+              "Insufficient SepoliaETH for gas fees. Please fund your wallet from a Sepolia faucet.",
+            );
+          }
+
+          if (tokenBalance < normalizedUnits) {
+            const haveFormatted = formatUnits(tokenBalance, decimals);
+            const needFormatted = formatUnits(normalizedUnits, decimals);
+            throw new Error(
+              `Insufficient ${symbol} balance: your wallet has ${haveFormatted} ${symbol}, but ${needFormatted} ${symbol} is required.`,
+            );
+          }
+
+          // Verify ERC-20 transfer(recipient, normalizedUnits) calldata & simulate on-chain
+          encodeFunctionData({
+            abi: erc20Abi,
+            functionName: "transfer",
+            args: [recipient, normalizedUnits],
+          });
+
+          await publicClient.simulateContract({
+            account: sender,
+            address: tokenContract,
+            abi: erc20Abi,
+            functionName: "transfer",
+            args: [recipient, normalizedUnits],
+          });
+        }
+
+        try {
+          return await writeContractAsync({
+            account: sender,
+            address: tokenContract,
+            abi: erc20Abi,
+            functionName: "transfer",
+            args: [recipient, normalizedUnits],
+            chainId: params.chainId,
+          });
+        } catch (err) {
+          throw new Error(
+            normalizeWalletError(
+              err,
+              "Transaction was cancelled or failed in wallet.",
+            ),
+          );
+        }
       }
 
-      // Native currency transfer
-      const txHash = (await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            from: params.from,
-            to: params.to,
-            value: toHex(valueBigInt),
-          },
-        ],
-      })) as string;
-      return txHash;
+      try {
+        return await sendTransactionAsync({
+          to: params.to as `0x${string}`,
+          value: normalizedUnits,
+          chainId: params.chainId,
+        });
+      } catch (err) {
+        throw new Error(
+          normalizeWalletError(
+            err,
+            "Transaction was cancelled or failed in wallet.",
+          ),
+        );
+      }
     },
-    [],
+    [
+      address,
+      chainId,
+      isConnected,
+      publicClient,
+      sendTransactionAsync,
+      writeContractAsync,
+    ],
   );
 
   return {
-    hasProvider,
+    hasProvider: true,
+    isConnected,
     address,
-    chainId,
-    isConnecting,
+    chainId: chainId ?? null,
+    connectorName: connector?.name ?? null,
+    isConnecting: isWagmiConnecting || isModalOpen,
     isSwitchingChain,
     walletError,
     setWalletError,
     connect,
     disconnect,
     switchNetwork,
+    checkBalances,
     sendPaymentTransaction,
   };
 }

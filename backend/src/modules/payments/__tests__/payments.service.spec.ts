@@ -1,5 +1,9 @@
 /// <reference types="jest" />
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
@@ -515,6 +519,79 @@ describe('PaymentsService', () => {
           chainId: 11155111,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject zero-address PAYMENT_WALLET_ADDRESS and missing USDC tokenAddress', async () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'PAYMENT_WALLET_ADDRESS') {
+          return '0x0000000000000000000000000000000000000000';
+        }
+        if (key === 'CRYPTO_TOKEN_SYMBOL') return 'USDC';
+        return undefined;
+      });
+
+      await expect(
+        service.initiatePayment(userId, {
+          orderId,
+          walletAddress,
+          chainId: 11155111,
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'PAYMENT_WALLET_ADDRESS') return merchantAddress;
+        if (key === 'CRYPTO_TOKEN_SYMBOL') return 'USDC';
+        if (key === 'CRYPTO_TOKEN_ADDRESS') return '';
+        return undefined;
+      });
+
+      await expect(
+        service.initiatePayment(userId, {
+          orderId,
+          walletAddress,
+          chainId: 11155111,
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('should recover idempotently and return existing active payment on concurrent E11000 duplicate paymentReference', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(makeOrder());
+      const existingActive = makePaymentDoc({ verificationStatus: 'pending' });
+      mockPaymentRepository.findLatestByOrderAndUser
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingActive);
+      mockPaymentRepository.countByOrder.mockResolvedValue(0);
+      mockPaymentRepository.create.mockRejectedValue({
+        code: 11000,
+        message: 'E11000 duplicate key error',
+      });
+
+      const res = await service.initiatePayment(userId, {
+        orderId,
+        walletAddress,
+        chainId: 11155111,
+      });
+
+      expect(res.paymentReference).toBe('PAY-123456');
+      expect(res.verificationStatus).toBe('pending');
+    });
+
+    it('should throw ConflictException instead of raw E11000 when duplicate key occurs with no active payment', async () => {
+      mockOrdersService.findUserOrderById.mockResolvedValue(makeOrder());
+      mockPaymentRepository.findLatestByOrderAndUser.mockResolvedValue(null);
+      mockPaymentRepository.countByOrder.mockResolvedValue(0);
+      mockPaymentRepository.create.mockRejectedValue({
+        code: 11000,
+        message: 'E11000 duplicate key error',
+      });
+
+      await expect(
+        service.initiatePayment(userId, {
+          orderId,
+          walletAddress,
+          chainId: 11155111,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

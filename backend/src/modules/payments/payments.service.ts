@@ -42,11 +42,24 @@ export class PaymentsService {
   ) {}
 
   getPublicConfig(): CryptoPaymentConfig {
-    const tokenAddress = this.configService
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
+    const rawTokenAddress = this.configService
       .get<string>('CRYPTO_TOKEN_ADDRESS')
-      ?.trim();
+      ?.trim()
+      .toLowerCase();
+    const tokenAddress =
+      rawTokenAddress && rawTokenAddress !== zeroAddress
+        ? rawTokenAddress
+        : undefined;
+    const rawDestinationAddress =
+      this.configService
+        .get<string>('PAYMENT_WALLET_ADDRESS')
+        ?.trim()
+        .toLowerCase() || '';
     const destinationAddress =
-      this.configService.get<string>('PAYMENT_WALLET_ADDRESS')?.trim() || '';
+      rawDestinationAddress && rawDestinationAddress !== zeroAddress
+        ? rawDestinationAddress
+        : '';
 
     return {
       chainId: this.configService.get<number>('CRYPTO_CHAIN_ID') ?? 11155111,
@@ -54,10 +67,10 @@ export class PaymentsService {
       token: (
         this.configService.get<string>('CRYPTO_TOKEN_SYMBOL') ?? 'USDC'
       ).toUpperCase(),
-      ...(tokenAddress ? { tokenAddress: tokenAddress.toLowerCase() } : {}),
+      ...(tokenAddress ? { tokenAddress } : {}),
       tokenDecimals:
         this.configService.get<number>('CRYPTO_TOKEN_DECIMALS') ?? 6,
-      destinationAddress: destinationAddress.toLowerCase(),
+      destinationAddress,
       requiredConfirmations:
         this.configService.get<number>('CRYPTO_REQUIRED_CONFIRMATIONS') ?? 3,
     };
@@ -78,6 +91,12 @@ export class PaymentsService {
     if (!config.destinationAddress) {
       throw new ServiceUnavailableException(
         'Merchant payment wallet address is not configured',
+      );
+    }
+
+    if (config.token !== 'ETH' && !config.tokenAddress) {
+      throw new ServiceUnavailableException(
+        `${config.token} token contract address is not configured`,
       );
     }
 
@@ -147,6 +166,13 @@ export class PaymentsService {
     ) {
       latestPayment.walletAddress = walletAddress;
       latestPayment.expectedAmount = expectedAmount;
+      latestPayment.chainId = config.chainId;
+      latestPayment.network = config.network;
+      latestPayment.token = config.token;
+      latestPayment.tokenAddress = config.tokenAddress;
+      latestPayment.tokenDecimals = config.tokenDecimals;
+      latestPayment.destinationAddress = config.destinationAddress;
+      latestPayment.requiredConfirmations = config.requiredConfirmations;
       const updated = await this.paymentRepository.save(latestPayment);
       return this.formatPayment(updated);
     }
@@ -160,30 +186,51 @@ export class PaymentsService {
         ? order.paymentReference
         : `${order.paymentReference}-${attemptNumber}`;
 
-    const created = await this.paymentRepository.create({
-      order: new Types.ObjectId(dto.orderId),
-      user: new Types.ObjectId(userId),
-      paymentReference,
-      orderPaymentReference: order.paymentReference,
-      attemptNumber,
-      paymentMethod: 'crypto_wallet',
-      chainId: config.chainId,
-      network: config.network,
-      token: config.token,
-      tokenAddress: config.tokenAddress,
-      tokenDecimals: config.tokenDecimals,
-      destinationAddress: config.destinationAddress,
-      walletAddress,
-      expectedAmount,
-      confirmations: 0,
-      requiredConfirmations: config.requiredConfirmations,
-      verificationStatus: 'pending',
-      expiresAt: order.paymentExpiresAt
-        ? new Date(order.paymentExpiresAt)
-        : new Date(Date.now() + 30 * 60 * 1000),
-    });
+    try {
+      const created = await this.paymentRepository.create({
+        order: new Types.ObjectId(dto.orderId),
+        user: new Types.ObjectId(userId),
+        paymentReference,
+        orderPaymentReference: order.paymentReference,
+        attemptNumber,
+        paymentMethod: 'crypto_wallet',
+        chainId: config.chainId,
+        network: config.network,
+        token: config.token,
+        tokenAddress: config.tokenAddress,
+        tokenDecimals: config.tokenDecimals,
+        destinationAddress: config.destinationAddress,
+        walletAddress,
+        expectedAmount,
+        confirmations: 0,
+        requiredConfirmations: config.requiredConfirmations,
+        verificationStatus: 'pending',
+        expiresAt: order.paymentExpiresAt
+          ? new Date(order.paymentExpiresAt)
+          : new Date(Date.now() + 30 * 60 * 1000),
+      });
 
-    return this.formatPayment(created);
+      return this.formatPayment(created);
+    } catch (error) {
+      if (this.isDuplicateKeyError(error)) {
+        const concurrentPayment =
+          await this.paymentRepository.findLatestByOrderAndUser(
+            dto.orderId,
+            userId,
+          );
+        if (
+          concurrentPayment &&
+          (concurrentPayment.verificationStatus === 'pending' ||
+            concurrentPayment.verificationStatus === 'confirming')
+        ) {
+          return this.formatPayment(concurrentPayment);
+        }
+        throw new ConflictException(
+          'A payment attempt is already being prepared for this order. Please retry.',
+        );
+      }
+      throw error;
+    }
   }
 
   async verifyPayment(
@@ -201,6 +248,12 @@ export class PaymentsService {
     if (!config.destinationAddress) {
       throw new ServiceUnavailableException(
         'Merchant payment wallet address is not configured',
+      );
+    }
+
+    if (config.token !== 'ETH' && !config.tokenAddress) {
+      throw new ServiceUnavailableException(
+        `${config.token} token contract address is not configured`,
       );
     }
 
