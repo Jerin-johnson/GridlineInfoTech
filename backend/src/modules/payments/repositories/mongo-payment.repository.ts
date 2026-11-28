@@ -33,6 +33,10 @@ export class MongoPaymentRepository implements IPaymentRepository {
     return payment.save({ session });
   }
 
+  async findById(paymentId: string): Promise<PaymentDocument | null> {
+    return this.paymentModel.findById(paymentId).exec();
+  }
+
   async findLatestByOrderAndUser(
     orderId: string,
     userId: string,
@@ -306,6 +310,9 @@ export class MongoPaymentRepository implements IPaymentRepository {
       confirmations: payment.confirmations,
       requiredConfirmations: payment.requiredConfirmations,
       failureReason: payment.failureReason,
+      refundTxHash: payment.refundTxHash,
+      reconciledAt: payment.reconciledAt,
+      reconciliationNote: payment.reconciliationNote,
       expiresAt: payment.expiresAt,
       verifiedAt: payment.verifiedAt,
       createdAt: payment.createdAt,

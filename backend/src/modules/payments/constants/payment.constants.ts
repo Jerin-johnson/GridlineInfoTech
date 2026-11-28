@@ -10,6 +10,7 @@ export const PAYMENT_VERIFICATION_STATUSES = [
   'wrong_network',
   'reverted',
   'expired',
+  'refunded',
   'failed',
 ] as const;
 

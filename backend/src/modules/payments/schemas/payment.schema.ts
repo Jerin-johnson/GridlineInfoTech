@@ -75,6 +75,18 @@ export class Payment {
   @Prop({ trim: true })
   failureReason?: string;
 
+  @Prop({ lowercase: true, trim: true })
+  refundTxHash?: string;
+
+  @Prop()
+  reconciledAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  reconciledBy?: Types.ObjectId;
+
+  @Prop({ trim: true })
+  reconciliationNote?: string;
+
   @Prop({ required: true })
   expiresAt!: Date;
 

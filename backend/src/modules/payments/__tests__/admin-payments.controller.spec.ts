@@ -5,6 +5,7 @@ import { ROLES_KEY } from '../../auth/constants/auth.constants';
 import { AdminPaymentsController } from '../admin-payments.controller';
 import { AdminPaymentsService } from '../admin-payments.service';
 import { AdminPaymentQueryDto } from '../dto/admin-payment-query.dto';
+import { ReconcilePaymentDto } from '../dto/reconcile-payment.dto';
 
 describe('AdminPaymentsController', () => {
   let controller: AdminPaymentsController;
@@ -13,6 +14,7 @@ describe('AdminPaymentsController', () => {
     getSummary: jest.fn(),
     findAllTransactions: jest.fn(),
     findTransactionById: jest.fn(),
+    reconcileTransaction: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -59,5 +61,43 @@ describe('AdminPaymentsController', () => {
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('should delegate reconcileTransaction to AdminPaymentsService', async () => {
+    mockService.reconcileTransaction.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      status: 'verified',
+    });
+
+    const res = await controller.reconcileTransaction(
+      '507f1f77bcf86cd799439011',
+      { action: 'fulfill', note: 'Confirmed' },
+      '507f1f77bcf86cd799439013',
+    );
+
+    expect(mockService.reconcileTransaction).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      { action: 'fulfill', note: 'Confirmed' },
+      '507f1f77bcf86cd799439013',
+    );
+    expect(res.message).toBe('Expired payment reconciled and order fulfilled');
+  });
+
+  it('should validate ReconcilePaymentDto for fulfill and refund actions', async () => {
+    const validFulfill = plainToInstance(ReconcilePaymentDto, {
+      action: 'fulfill',
+    });
+    expect(await validate(validFulfill)).toHaveLength(0);
+
+    const invalidRefund = plainToInstance(ReconcilePaymentDto, {
+      action: 'refund',
+    });
+    expect((await validate(invalidRefund)).length).toBeGreaterThanOrEqual(1);
+
+    const validRefund = plainToInstance(ReconcilePaymentDto, {
+      action: 'refund',
+      refundTxHash: '0x' + 'b'.repeat(64),
+    });
+    expect(await validate(validRefund)).toHaveLength(0);
   });
 });

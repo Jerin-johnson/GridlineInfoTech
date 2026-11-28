@@ -38,6 +38,16 @@ const TERMINAL_FAILED_STATUSES = new Set<PaymentVerificationStatus>([
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLL_ATTEMPTS = 30;
 
+function formatCountdown(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(clamped / 3600);
+  const minutes = Math.floor((clamped % 3600) / 60);
+  const seconds = clamped % 60;
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 interface CryptoPaymentPanelProps {
   order: FormattedOrder;
   config: CryptoPaymentConfig;
@@ -62,6 +72,36 @@ export function CryptoPaymentPanel({
   const [isVerifying, setIsVerifying] = useState(false);
   const [pollLimitReached, setPollLimitReached] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  const parsedExpiresAtMs = order.paymentExpiresAt
+    ? new Date(order.paymentExpiresAt).getTime()
+    : NaN;
+  const expiresAtMs = Number.isNaN(parsedExpiresAtMs)
+    ? null
+    : parsedExpiresAtMs;
+
+  useEffect(() => {
+    if (expiresAtMs === null) return;
+    setNowMs(Date.now());
+    if (Date.now() >= expiresAtMs) return;
+
+    const timer = setInterval(() => {
+      const current = Date.now();
+      setNowMs(current);
+      if (current >= expiresAtMs) {
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [expiresAtMs]);
+
+  const isReservationExpired =
+    order.paymentStatus === "expired" ||
+    (expiresAtMs !== null && nowMs >= expiresAtMs);
+  const remainingSeconds =
+    expiresAtMs !== null ? Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000)) : null;
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollAttemptsRef = useRef(0);
@@ -282,6 +322,16 @@ export function CryptoPaymentPanel({
 
   const handlePayNow = async (forceNewAttempt = false) => {
     if (isTransferring || isVerifying || isInitiating || !wallet.address) {
+      return;
+    }
+    if (
+      isReservationExpired ||
+      (expiresAtMs !== null && Date.now() >= expiresAtMs)
+    ) {
+      setNowMs(Date.now());
+      setPhaseError(
+        "Payment reservation window has expired. Please place a new order to continue.",
+      );
       return;
     }
     if (wallet.chainId !== config.chainId) {
@@ -564,11 +614,36 @@ export function CryptoPaymentPanel({
 
         {order.paymentExpiresAt && (
           <p className="text-[11px] text-[#A1A1AA]">
-            Reservation expires at{" "}
-            <span className="text-[#F5F5F3] tabular-nums">
-              {new Date(order.paymentExpiresAt).toLocaleTimeString()}
-            </span>
-            . Required confirmations: {config.requiredConfirmations}.
+            {isReservationExpired ? (
+              <>
+                <span className="text-amber-400 font-medium">
+                  Reservation expired at{" "}
+                  <span className="tabular-nums">
+                    {new Date(order.paymentExpiresAt).toLocaleTimeString()}
+                  </span>
+                  .
+                </span>{" "}
+                Required confirmations: {config.requiredConfirmations}.
+              </>
+            ) : (
+              <>
+                Reservation expires at{" "}
+                <span className="text-[#F5F5F3] tabular-nums">
+                  {new Date(order.paymentExpiresAt).toLocaleTimeString()}
+                </span>
+                {remainingSeconds !== null && (
+                  <>
+                    {" "}
+                    (
+                    <span className="text-[#F5F5F3] tabular-nums">
+                      {formatCountdown(remainingSeconds)}
+                    </span>{" "}
+                    remaining)
+                  </>
+                )}
+                . Required confirmations: {config.requiredConfirmations}.
+              </>
+            )}
           </p>
         )}
 
@@ -646,6 +721,23 @@ export function CryptoPaymentPanel({
         </div>
       )}
 
+      {/* Reservation Expired Notice */}
+      {isReservationExpired && !isAwaitingConfirmations && (
+        <div
+          role="alert"
+          className="border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-2.5 text-xs text-amber-200"
+        >
+          <AlertCircle
+            className="w-4 h-4 text-amber-400 shrink-0 mt-0.5"
+            aria-hidden="true"
+          />
+          <span>
+            Payment reservation window has expired. Please place a new order to
+            continue.
+          </span>
+        </div>
+      )}
+
       {/* Error / Rejection Messages */}
       {(wallet.walletError || phaseError) && (
         <div
@@ -668,6 +760,7 @@ export function CryptoPaymentPanel({
           disabled={
             !wallet.address ||
             isWrongNetwork ||
+            isReservationExpired ||
             isInitiating ||
             isTransferring ||
             isVerifying ||
@@ -675,15 +768,17 @@ export function CryptoPaymentPanel({
           }
           className="w-full min-h-[48px] bg-[#C81E1E] hover:bg-[#A61717] text-[#F5F5F3] px-6 text-[11px] tracking-[0.22em] uppercase font-medium transition-colors cursor-pointer disabled:bg-[#141417] disabled:text-[#71717A] disabled:border disabled:border-white/10 disabled:cursor-not-allowed"
         >
-          {isTransferring
-            ? "Confirm Transfer in Wallet..."
-            : isVerifying
-              ? "Verifying Transaction..."
-              : isInitiating
-                ? "Preparing Attempt..."
-                : isTerminalRejected
-                  ? `Retry Payment (New Attempt) · ${formattedTokenAmount ?? ""} ${config.token}`
-                  : `Pay ${formattedTokenAmount ?? ""} ${config.token}`}
+          {isReservationExpired
+            ? "Reservation Expired"
+            : isTransferring
+              ? "Confirm Transfer in Wallet..."
+              : isVerifying
+                ? "Verifying Transaction..."
+                : isInitiating
+                  ? "Preparing Attempt..."
+                  : isTerminalRejected
+                    ? `Retry Payment (New Attempt) · ${formattedTokenAmount ?? ""} ${config.token}`
+                    : `Pay ${formattedTokenAmount ?? ""} ${config.token}`}
         </button>
       )}
     </section>
