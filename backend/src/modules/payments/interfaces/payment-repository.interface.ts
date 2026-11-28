@@ -16,6 +16,7 @@ export interface IPaymentRepository {
     payment: PaymentDocument,
     session?: ClientSession,
   ): Promise<PaymentDocument>;
+  findById(paymentId: string): Promise<PaymentDocument | null>;
   findLatestByOrderAndUser(
     orderId: string,
     userId: string,

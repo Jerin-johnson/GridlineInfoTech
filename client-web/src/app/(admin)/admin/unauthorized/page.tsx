@@ -20,7 +20,7 @@ export default function AdminUnauthorizedPage() {
       // Ignore if already logged out
     } finally {
       useCartStore.getState().logoutToGuest();
-      router.replace("/login?redirect=%2Fadmin");
+      router.replace("/admin/login?redirect=%2Fadmin");
       router.refresh();
     }
   };

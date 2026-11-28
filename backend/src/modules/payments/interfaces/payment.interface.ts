@@ -130,6 +130,9 @@ export interface AdminCryptoPaymentDetailRecord {
   confirmations: number;
   requiredConfirmations: number;
   failureReason?: string;
+  refundTxHash?: string;
+  reconciledAt?: Date;
+  reconciliationNote?: string;
   expiresAt: Date;
   verifiedAt?: Date;
   createdAt?: Date;

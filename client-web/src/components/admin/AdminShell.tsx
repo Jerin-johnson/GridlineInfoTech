@@ -33,7 +33,7 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
     try {
       const user = await getCurrentUser();
       if (!user) {
-        router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+        router.replace(`/admin/login?redirect=${encodeURIComponent(pathname)}`);
         return;
       }
       if (user.role !== "admin") {
@@ -58,7 +58,7 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
       .then((user) => {
         if (!active) return;
         if (!user) {
-          router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+          router.replace(`/admin/login?redirect=${encodeURIComponent(pathname)}`);
           return;
         }
         if (user.role !== "admin") {
