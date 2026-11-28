@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bodoni_Moda, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SmoothScrollProvider } from "@/components/motion/SmoothScrollProvider";
+import { Web3Provider } from "@/components/providers/Web3Provider";
 
 const bodoni = Bodoni_Moda({
   subsets: ["latin"],
@@ -31,7 +32,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${bodoni.variable} ${jakarta.variable} dark`}>
       <body className="bg-[#080808] text-[#F5F5F3] font-sans antialiased selection:bg-[#C81E1E] selection:text-white overflow-x-hidden">
-        <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        <Web3Provider>
+          <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        </Web3Provider>
       </body>
     </html>
   );
