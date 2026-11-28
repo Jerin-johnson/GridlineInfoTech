@@ -1,5 +1,7 @@
 import Joi from 'joi';
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 export const configValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
@@ -21,12 +23,14 @@ export const configValidationSchema = Joi.object({
   CRYPTO_TOKEN_SYMBOL: Joi.string().default('USDC'),
   CRYPTO_TOKEN_ADDRESS: Joi.string()
     .pattern(/^0x[a-fA-F0-9]{40}$/)
+    .invalid(ZERO_ADDRESS)
     .optional()
     .allow(''),
   CRYPTO_TOKEN_DECIMALS: Joi.number().integer().min(0).max(18).default(6),
   CRYPTO_REQUIRED_CONFIRMATIONS: Joi.number().integer().min(1).default(3),
   PAYMENT_WALLET_ADDRESS: Joi.string()
     .pattern(/^0x[a-fA-F0-9]{40}$/)
+    .invalid(ZERO_ADDRESS)
     .optional()
     .allow(''),
 });
