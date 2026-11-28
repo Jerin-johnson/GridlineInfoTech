@@ -1,0 +1,2646 @@
+{
+  "info": {
+    "_postman_id": "8c5f0b62-9f41-4c28-a1c2-7b2e19c5d101",
+    "name": "GridLine / APEX ATELIER Ecommerce API (v1)",
+    "description": "Complete Postman Collection v2.1 for the NestJS backend (/api/v1). Covers Auth, Users & Addresses, Categories, Brands, Products, Cart, Checkout & Orders, Payments (Sepolia USDC + COD), Uploads, and Admin Operations (Customers, Inventory, Orders, Payments, Dashboard).\n\nAuthentication: Global JwtAuthGuard accepts either HTTP-only cookies (`accessToken`, `refreshToken`) or `Authorization: Bearer <accessToken>`. Endpoints marked @Public() do not require authentication.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id",
+      "value": "507f1f77bcf86cd799439011",
+      "type": "string"
+    },
+    {
+      "key": "slug",
+      "value": "carbon-rear-diffuser",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "507f1f77bcf86cd799439011",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "507f1f77bcf86cd799439012",
+      "type": "string"
+    },
+    {
+      "key": "brandId",
+      "value": "507f1f77bcf86cd799439013",
+      "type": "string"
+    },
+    {
+      "key": "addressId",
+      "value": "507f1f77bcf86cd799439014",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "507f1f77bcf86cd799439015",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "507f1f77bcf86cd799439016",
+      "type": "string"
+    },
+    {
+      "key": "transactionId",
+      "value": "507f1f77bcf86cd799439017",
+      "type": "string"
+    },
+    {
+      "key": "walletAddress",
+      "value": "0x9caf00b105eb105120921fbf00d3509c5776bf79",
+      "type": "string"
+    },
+    {
+      "key": "txHash",
+      "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Health",
+      "item": [
+        {
+          "name": "Health Check (Root)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": []
+            },
+            "description": "Public root health endpoint (`AppController.getHello`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "Hello World!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Auth",
+      "item": [
+        {
+          "name": "Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Public (`@Public()`). Registers a new customer, sets `accessToken` and `refreshToken` HTTP-only cookies, and returns tokens + user profile.\n\nDTO (`RegisterDto`):\n- `firstName` (required, string, max 50)\n- `lastName` (required, string, max 50)\n- `email` (required, valid email)\n- `password` (required, 8-64 chars, >=1 upper, >=1 lower, >=1 digit or special char)",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Elena\",\n  \"lastName\": \"Vance\",\n  \"email\": \"elena@example.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Registration successful\",\n  \"user\": {\n    \"id\": \"507f1f77bcf86cd799439011\",\n    \"email\": \"elena@example.com\",\n    \"firstName\": \"Elena\",\n    \"lastName\": \"Vance\",\n    \"role\": \"customer\"\n  },\n  \"accessToken\": \"<jwt>\",\n  \"refreshToken\": \"<jwt>\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const json = pm.response.json();",
+                  "    if (json.accessToken) pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    if (json.refreshToken) pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    if (json.user && json.user.id) pm.collectionVariables.set(\"userId\", json.user.id);",
+                  "  } catch (_) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Customer or Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Public (`@Public()`). Authenticates with email & password, sets HTTP-only cookies (`accessToken`, `refreshToken`), and returns tokens + user.\n\nDTO (`LoginDto`): `email` (required), `password` (required).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@apexatelier.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Login successful\",\n  \"user\": {\n    \"id\": \"507f1f77bcf86cd799439011\",\n    \"email\": \"admin@apexatelier.com\",\n    \"firstName\": \"Admin\",\n    \"lastName\": \"User\",\n    \"role\": \"admin\"\n  },\n  \"accessToken\": \"<jwt>\",\n  \"refreshToken\": \"<jwt>\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const json = pm.response.json();",
+                  "    if (json.accessToken) pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    if (json.refreshToken) pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    if (json.user && json.user.id) pm.collectionVariables.set(\"userId\", json.user.id);",
+                  "  } catch (_) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Google OAuth Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google"
+              ]
+            },
+            "description": "Public (`@Public()`). Verifies a Google ID token (`credential`) and issues session cookies + JWT tokens.\n\nDTO (`GoogleLoginDto`): `credential` (required, string).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"<google-id-token>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Google authentication successful\",\n  \"user\": {\n    \"id\": \"507f1f77bcf86cd799439011\",\n    \"email\": \"user@gmail.com\",\n    \"firstName\": \"Alex\",\n    \"lastName\": \"Mercer\",\n    \"role\": \"customer\"\n  },\n  \"accessToken\": \"<jwt>\",\n  \"refreshToken\": \"<jwt>\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const json = pm.response.json();",
+                  "    if (json.accessToken) pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    if (json.refreshToken) pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    if (json.user && json.user.id) pm.collectionVariables.set(\"userId\", json.user.id);",
+                  "  } catch (_) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Public (`@Public()`). Reads `refreshToken` from cookie or request body (`RefreshTokenDto`), rotates tokens, and sets new cookies.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Token refreshed successfully\",\n  \"user\": {\n    \"id\": \"507f1f77bcf86cd799439011\",\n    \"email\": \"elena@example.com\",\n    \"role\": \"customer\"\n  },\n  \"accessToken\": \"<jwt>\",\n  \"refreshToken\": \"<jwt>\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  try {",
+                  "    const json = pm.response.json();",
+                  "    if (json.accessToken) pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    if (json.refreshToken) pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    if (json.user && json.user.id) pm.collectionVariables.set(\"userId\", json.user.id);",
+                  "  } catch (_) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Authenticated (`JwtAuthGuard`). Revokes refresh token (from cookie or optional `RefreshTokenDto.refreshToken`) and clears auth cookies.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 · Users & Addresses",
+      "item": [
+        {
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Authenticated. Returns the current user safe profile."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"User profile retrieved successfully\",\n  \"data\": {}\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Current User Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Authenticated. DTO (`UpdateProfileDto`): all optional (`firstName`, `lastName`, `phone`, `avatar`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Elena\",\n  \"lastName\": \"Vance\",\n  \"phone\": \"+1-555-0199\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"User profile updated successfully\",\n  \"data\": {}\n}"
+            }
+          ]
+        },
+        {
+          "name": "List User Addresses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses"
+              ]
+            },
+            "description": "Authenticated. Returns all saved shipping addresses for the current user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Addresses retrieved successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses"
+              ]
+            },
+            "description": "Authenticated. DTO (`CreateAddressDto`): required `label`, `fullName`, `phone`, `line1`, `city`, `state`, `postalCode`; optional `line2`, `country` (default `\"US\"`), `isDefault` (default `false`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Home\",\n  \"fullName\": \"Elena Vance\",\n  \"phone\": \"+1-555-0199\",\n  \"line1\": \"742 Evergreen Terrace\",\n  \"line2\": \"Suite 4B\",\n  \"city\": \"Austin\",\n  \"state\": \"TX\",\n  \"postalCode\": \"78701\",\n  \"country\": \"US\",\n  \"isDefault\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Address added successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Set Default Address",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/addresses/:addressId/default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                ":addressId",
+                "default"
+              ],
+              "variable": [
+                {
+                  "key": "addressId",
+                  "value": "{{addressId}}",
+                  "description": "Path parameter: addressId"
+                }
+              ]
+            },
+            "description": "Authenticated. Marks `:addressId` as the default shipping address."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Default address updated successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/addresses/:addressId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                ":addressId"
+              ],
+              "variable": [
+                {
+                  "key": "addressId",
+                  "value": "{{addressId}}",
+                  "description": "Path parameter: addressId"
+                }
+              ]
+            },
+            "description": "Authenticated. DTO (`UpdateAddressDto`): all fields optional.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Garage\",\n  \"city\": \"Dallas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Address updated successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/addresses/:addressId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                ":addressId"
+              ],
+              "variable": [
+                {
+                  "key": "addressId",
+                  "value": "{{addressId}}",
+                  "description": "Path parameter: addressId"
+                }
+              ]
+            },
+            "description": "Authenticated. Removes `:addressId` from the user profile."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Address deleted successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true
+                },
+                {
+                  "key": "parent",
+                  "value": "null",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Public (`@Public()`). Non-admins always receive `active` categories; authenticated admins may pass `status=all|active|inactive`. Optional `page`/`limit` (max 50) enable pagination.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Categories retrieved successfully\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Category by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/slug/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "slug",
+                ":slug"
+              ],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "{{slug}}",
+                  "description": "Path parameter: slug"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`CreateCategoryDto`): required `name` (max 100); optional `slug` (kebab-case), `description`, `image` (URL), `parent` (MongoId), `status` (`active|inactive`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aerodynamics\",\n  \"slug\": \"aerodynamics\",\n  \"description\": \"Carbon fiber aero components\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Category created successfully\",\n  \"data\": {}\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Category (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`UpdateCategoryDto`): all fields optional (`parent` can be `null`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aerodynamics & Body\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Category (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Soft-deactivates the category."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 · Brands",
+      "item": [
+        {
+          "name": "List Brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Public (`@Public()`). Non-admins receive `active` brands; admins may pass `status=all|active|inactive`. Optional `page`/`limit` (max 50).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Brand by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brands/slug/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                "slug",
+                ":slug"
+              ],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "{{slug}}",
+                  "description": "Path parameter: slug"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Brand by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brands/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Brand (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands"
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`CreateBrandDto`): required `name`; optional `slug`, `logo` (URL), `description`, `status` (`active|inactive`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Akrapovic\",\n  \"slug\": \"akrapovic\",\n  \"description\": \"Titanium exhaust systems\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Brand (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brands/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`UpdateBrandDto`): all fields optional.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Performance titanium exhaust systems\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Brand (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/brands/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Soft-deactivates the brand."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 · Products",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=12",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "12"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "category",
+                  "value": "{{categoryId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "brand",
+                  "value": "{{brandId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "minPrice",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "500000",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "published",
+                  "disabled": true
+                },
+                {
+                  "key": "inStockOnly",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "isFeatured",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "disabled": true
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Public (`@Public()`). Supports `ProductQueryDto` filtering, sorting, and pagination. Admins receive `status` visibility.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/slug/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "slug",
+                ":slug"
+              ],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "{{slug}}",
+                  "description": "Path parameter: slug"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Related Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/related?limit=4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "related"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "4"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`). `limit` defaults to 4 (clamped 1..20).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Public (`@Public()`).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`CreateProductDto`): required `name`, `sku`, `category` (MongoId), `brand` (MongoId), `price` (int cents >= 0); optional `slug`, `description`, `compareAtPrice`, `currency`, `images`, `specifications`, `compatibility`, `stock`, `reservedStock`, `lowStockThreshold`, `status` (`draft|published|out_of_stock|archived`), `isFeatured`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Akrapovic Pre-Preg Carbon Diffuser\",\n  \"sku\": \"AKR-CF-DIFF-01\",\n  \"category\": \"{{categoryId}}\",\n  \"brand\": \"{{brandId}}\",\n  \"price\": 165000,\n  \"stock\": 10,\n  \"lowStockThreshold\": 2,\n  \"status\": \"published\",\n  \"isFeatured\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Product Image (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "alt",
+                  "value": "Carbon diffuser studio angle",
+                  "type": "text"
+                },
+                {
+                  "key": "isPrimary",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "images"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `multipart/form-data` using `FileInterceptor(\"image\")`. Optional text fields: `alt`, `isPrimary`."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Product Image (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "images"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Removes an image by Cloudinary `publicId`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicId\": \"gridline/products/sample-id\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`UpdateProductDto`): all fields optional.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 159000,\n  \"isFeatured\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archive Product (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Archives the product."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 · Cart",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart"
+              ]
+            },
+            "description": "Authenticated. Returns the current user cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "items"
+              ]
+            },
+            "description": "Authenticated. DTO (`AddToCartDto`): required `productId` (MongoId); optional `quantity` (int >= 1, default 1).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Merge Guest Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "merge"
+              ]
+            },
+            "description": "Authenticated. DTO (`MergeCartDto`): `items` array of `{ productId, quantity }`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Cart Item Quantity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cart/items/:productId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "items",
+                ":productId"
+              ],
+              "variable": [
+                {
+                  "key": "productId",
+                  "value": "{{productId}}",
+                  "description": "Path parameter: productId"
+                }
+              ]
+            },
+            "description": "Authenticated. DTO (`UpdateCartItemDto`): required `quantity` (int >= 1).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart/items/:productId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart",
+                "items",
+                ":productId"
+              ],
+              "variable": [
+                {
+                  "key": "productId",
+                  "value": "{{productId}}",
+                  "description": "Path parameter: productId"
+                }
+              ]
+            },
+            "description": "Authenticated. Removes `:productId` from cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cart"
+              ]
+            },
+            "description": "Authenticated. Empties the user cart."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08 · Checkout & Orders",
+      "item": [
+        {
+          "name": "Checkout (Create Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "checkout"
+              ]
+            },
+            "description": "Authenticated. Creates an order from the user cart, reserves stock, and sets `paymentExpiresAt` (30 minutes for `crypto_wallet`).\n\nDTO (`CheckoutDto`): required `addressId` (MongoId); optional `paymentMethod` (`crypto_wallet` | `cod`, default `crypto_wallet`), `notes` (max 500), `idempotencyKey` (max 128).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"paymentMethod\": \"crypto_wallet\",\n  \"notes\": \"Leave at front reception\",\n  \"idempotencyKey\": \"chk-001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Order created successfully\",\n  \"data\": {\n    \"id\": \"507f1f77bcf86cd799439015\",\n    \"orderNumber\": \"ORD-20261128-ABC123\",\n    \"paymentStatus\": \"pending\",\n    \"fulfilmentStatus\": \"placed\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List User Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "fulfilmentStatus",
+                  "value": "placed",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": "pending",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Authenticated. `OrderQueryDto`: `page`, `limit` (max 50), `fulfilmentStatus`, `paymentStatus`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                ":orderId"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Authenticated. Returns order details owned by the current user."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/:orderId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                ":orderId",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Authenticated. Cancels a cancellable order (`placed` + `pending`/`failed`) and releases reserved stock. DTO (`CancelOrderDto`): optional `reason` (max 500).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed my mind\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09 · Payments (Crypto & Order Status)",
+      "item": [
+        {
+          "name": "Get Public Crypto Payment Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "config"
+              ]
+            },
+            "description": "Public (`@Public()`). Returns active EVM chain (`chainId`, `network`), token (`token`, `tokenAddress`, `tokenDecimals`), `destinationAddress`, and `requiredConfirmations`.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payment configuration retrieved successfully\",\n  \"data\": {\n    \"chainId\": 11155111,\n    \"network\": \"Sepolia\",\n    \"token\": \"USDC\",\n    \"tokenAddress\": \"0x1c7d4b196cb0c7b01d743fbc6116a902379c7238\",\n    \"tokenDecimals\": 6,\n    \"destinationAddress\": \"0x9caf00b105eb105120921fbf00d3509c5776bf79\",\n    \"requiredConfirmations\": 3\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Initiate Crypto Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/initiate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "initiate"
+              ]
+            },
+            "description": "Authenticated. Idempotently creates or returns an active payment attempt (`pending` / `confirming`) for the order.\n\nDTO (`InitiatePaymentDto`): required `orderId` (MongoId), `walletAddress` (EVM `0x` + 40 hex); optional `chainId` (int >= 1).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"walletAddress\": \"{{walletAddress}}\",\n  \"chainId\": 11155111\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Crypto Payment Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "verify"
+              ]
+            },
+            "description": "Authenticated. Verifies an on-chain ERC-20 `Transfer` receipt via JSON-RPC (`BlockchainVerifierService`), checks confirmations (`>= requiredConfirmations`), prevents tx replay across orders, and transitions the order to `paid`.\n\nDTO (`VerifyPaymentDto`): required `orderId` (MongoId), `transactionHash` (`0x` + 64 hex), `walletAddress` (`0x` + 40 hex), `chainId` (int >= 1).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"transactionHash\": \"{{txHash}}\",\n  \"walletAddress\": \"{{walletAddress}}\",\n  \"chainId\": 11155111\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Latest Payment for Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/order/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "order",
+                ":orderId"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Authenticated. Returns the latest payment attempt for `:orderId` owned by the current user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10 · Uploads (Admin)",
+      "item": [
+        {
+          "name": "Upload Image to Cloudinary (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "folder",
+                  "value": "gridline/products",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/uploads/image",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "uploads",
+                "image"
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `multipart/form-data` using `FileInterceptor(\"image\")`. Optional `folder` (`gridline/brands`, `gridline/categories`, `gridline/products`; defaults to `gridline/products`)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11 · Admin Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Analytics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard?range=30d",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "range",
+                  "value": "30d"
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "2026-11-01",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-11-28",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `AdminDashboardQueryDto`: `range` (`7d|30d|90d|all`, default `30d`), optional ISO `dateFrom`, `dateTo`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12 · Admin Customers",
+      "item": [
+        {
+          "name": "List Customers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers?page=1&limit=15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "15"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "all",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "disabled": true
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `AdminCustomerQueryDto`: `page`, `limit` (max 100), `search`, `status` (`all|active|inactive`), `sortBy` (`createdAt|firstName|email|lastLoginAt`), `sortOrder` (`asc|desc`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer by ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers/:customerId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers",
+                ":customerId"
+              ],
+              "variable": [
+                {
+                  "key": "customerId",
+                  "value": "{{customerId}}",
+                  "description": "Path parameter: customerId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer Active Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers/:customerId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers",
+                ":customerId",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "customerId",
+                  "value": "{{customerId}}",
+                  "description": "Path parameter: customerId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`UpdateCustomerStatusDto`): required `isActive` (boolean).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "13 · Admin Inventory",
+      "item": [
+        {
+          "name": "List Inventory (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inventory?page=1&limit=15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "15"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "stockStatus",
+                  "value": "all",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "updatedAt",
+                  "disabled": true
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `AdminInventoryQueryDto`: `page`, `limit`, `search`, `stockStatus` (`all|in_stock|low_stock|out_of_stock`), `sortBy`, `sortOrder`."
+          },
+          "response": []
+        },
+        {
+          "name": "List Inventory Movements (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inventory/movements?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inventory",
+                "movements"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "productId",
+                  "value": "{{productId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "admin_adjustment",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `InventoryMovementQueryDto`: `page`, `limit` (max 100), `productId` (MongoId), `type` (`initial_stock|admin_adjustment|stock_reservation|reservation_release|order_fulfillment|order_cancellation`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Product Inventory (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inventory/:productId/adjust",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inventory",
+                ":productId",
+                "adjust"
+              ],
+              "variable": [
+                {
+                  "key": "productId",
+                  "value": "{{productId}}",
+                  "description": "Path parameter: productId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`AdjustInventoryDto`): required `type` (`increase|decrease`), `quantity` (int 1..100000), `reason` (max 500).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"increase\",\n  \"quantity\": 5,\n  \"reason\": \"Restocked from supplier shipment #402\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "14 · Admin Orders",
+      "item": [
+        {
+          "name": "List All Orders (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/orders?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "fulfilmentStatus",
+                  "value": "placed",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": "pending",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `AdminOrderQueryDto`: `page`, `limit` (max 50), `search`, `fulfilmentStatus`, `paymentStatus`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order by ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "orders",
+                ":orderId"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Order Fulfilment Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/orders/:orderId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "orders",
+                ":orderId",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). DTO (`UpdateOrderStatusDto`): required `fulfilmentStatus` (`processing|shipped|out_for_delivery|delivered|cancelled`); optional `codPaymentReceived` (boolean), `note`, `shippingProvider`, `trackingNumber`, `trackingUrl` (HTTP/HTTPS URL).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fulfilmentStatus\": \"processing\",\n  \"note\": \"Packed and ready for dispatch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "15 · Admin Payments",
+      "item": [
+        {
+          "name": "Get Payment Summary (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/payments/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "payments",
+                "summary"
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Returns revenue & attempt summary."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Payment Transactions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/payments?page=1&limit=15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "15"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "all",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "all",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "2026-11-01",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-11-28",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). `AdminPaymentQueryDto`: `page`, `limit`, `search`, `status` (`all|verified|paid|pending|confirming|failed|expired`), `paymentMethod` (`all|crypto_wallet|cod`), `dateFrom`, `dateTo`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment Transaction Detail (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/payments/:transactionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "payments",
+                ":transactionId"
+              ],
+              "variable": [
+                {
+                  "key": "transactionId",
+                  "value": "{{transactionId}}",
+                  "description": "Path parameter: transactionId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Looks up by Payment ID or falls back to COD Order ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Reconcile Expired Payment (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/payments/:transactionId/reconcile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "payments",
+                ":transactionId",
+                "reconcile"
+              ],
+              "variable": [
+                {
+                  "key": "transactionId",
+                  "value": "{{transactionId}}",
+                  "description": "Path parameter: transactionId"
+                }
+              ]
+            },
+            "description": "Admin only (`@Roles(\"admin\")`). Reconciles an `expired` crypto payment that has an on-chain `transactionHash`: `action: \"fulfill\"` re-reserves stock and marks the order `paid`, or `action: \"refund\"` records `refundTxHash` (`0x` + 64 hex) and marks both payment and order `refunded`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"fulfill\",\n  \"note\": \"Verified 3+ confirmations on Sepolia Etherscan; stock re-reserved.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
