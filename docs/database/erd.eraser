@@ -1,0 +1,201 @@
+title GridLine / APEX ATELIER Ecommerce — MongoDB Schema
+
+// ==========================================
+// 1. Identity & Authentication
+// ==========================================
+
+users [icon: users, color: blue] {
+  _id ObjectId pk
+  firstName string
+  lastName string
+  email string unique
+  passwordHash string nullable
+  authProvider enum "local | google"
+  role enum "customer | admin"
+  phone string nullable
+  avatar string nullable
+  isActive boolean
+  isEmailVerified boolean
+  addresses Address_embedded[]
+  lastLoginAt Date nullable
+  createdAt Date
+  updatedAt Date
+}
+
+refresh_tokens [icon: key, color: blue] {
+  _id ObjectId pk
+  userId ObjectId fk
+  tokenHash string unique
+  family string
+  expiresAt Date "TTL: 0s"
+  isRevoked boolean
+  createdAt Date
+  updatedAt Date
+}
+
+// ==========================================
+// 2. Catalog & Inventory
+// ==========================================
+
+categories [icon: folder, color: purple] {
+  _id ObjectId pk
+  name string
+  slug string unique
+  description string nullable
+  image string nullable
+  parent ObjectId fk nullable
+  status enum "active | inactive"
+  createdAt Date
+  updatedAt Date
+}
+
+brands [icon: tag, color: purple] {
+  _id ObjectId pk
+  name string
+  slug string unique
+  logo string nullable
+  description string nullable
+  status enum "active | inactive"
+  createdAt Date
+  updatedAt Date
+}
+
+products [icon: package, color: purple] {
+  _id ObjectId pk
+  name string
+  slug string unique
+  sku string unique
+  description string nullable
+  category ObjectId fk
+  brand ObjectId fk
+  price number "cents >= 0"
+  compareAtPrice number nullable
+  currency string
+  images ProductImage_embedded[]
+  specifications ProductSpec_embedded[]
+  compatibility ProductFitment_embedded[]
+  stock number
+  reservedStock number
+  lowStockThreshold number
+  status enum "draft | published | out_of_stock | archived"
+  isFeatured boolean
+  createdAt Date
+  updatedAt Date
+}
+
+inventory_movements [icon: activity, color: orange] {
+  _id ObjectId pk
+  product ObjectId fk
+  type enum "initial_stock | admin_adjustment | stock_reservation | reservation_release | order_fulfillment | order_cancellation"
+  quantity number
+  delta number
+  previousStock number
+  resultingStock number
+  previousReservedStock number
+  resultingReservedStock number
+  reason string
+  actor ObjectId fk nullable
+  order ObjectId fk nullable
+  createdAt Date
+  updatedAt Date
+}
+
+// ==========================================
+// 3. Cart, Orders & Crypto Payments
+// ==========================================
+
+carts [icon: shopping-cart, color: green] {
+  _id ObjectId pk
+  user ObjectId fk unique nullable
+  sessionId string unique nullable
+  items CartItem_embedded[]
+  expiresAt Date nullable
+  createdAt Date
+  updatedAt Date
+}
+
+orders [icon: shopping-bag, color: green] {
+  _id ObjectId pk
+  orderNumber string unique
+  paymentReference string unique
+  idempotencyKey string nullable
+  user ObjectId fk
+  customerEmail string
+  items OrderItem_embedded[]
+  shippingAddress OrderShippingAddress_embedded
+  subtotal number "cents"
+  shippingCost number "cents"
+  taxAmount number "cents"
+  totalAmount number "cents"
+  currency string
+  paymentMethod string "crypto_wallet | cod"
+  paymentStatus enum "pending | confirming | paid | failed | expired | refunded"
+  fulfilmentStatus enum "placed | payment_confirmed | processing | shipped | out_for_delivery | delivered | cancelled"
+  statusHistory OrderStatusHistory_embedded[]
+  stockReserved boolean
+  paymentExpiresAt Date nullable
+  cancelledAt Date nullable
+  cancellationReason string nullable
+  shippingProvider string nullable
+  trackingNumber string nullable
+  trackingUrl string nullable
+  shippedAt Date nullable
+  deliveredAt Date nullable
+  paidAt Date nullable
+  codPaymentConfirmedBy string nullable
+  notes string nullable
+  createdAt Date
+  updatedAt Date
+}
+
+payments [icon: credit-card, color: red] {
+  _id ObjectId pk
+  order ObjectId fk
+  user ObjectId fk
+  paymentReference string unique
+  orderPaymentReference string
+  attemptNumber number
+  paymentMethod string
+  chainId number
+  network string
+  token string
+  tokenAddress string nullable
+  tokenDecimals number
+  destinationAddress string
+  walletAddress string
+  transactionHash string nullable
+  expectedAmount string "base units"
+  receivedAmount string nullable
+  blockNumber number nullable
+  confirmations number
+  requiredConfirmations number
+  verificationStatus enum "pending | confirming | verified | underpaid | overpaid | wrong_token | wrong_network | reverted | expired | refunded | failed"
+  failureReason string nullable
+  refundTxHash string nullable
+  reconciledAt Date nullable
+  reconciledBy ObjectId fk nullable
+  reconciliationNote string nullable
+  expiresAt Date
+  verifiedAt Date nullable
+  createdAt Date
+  updatedAt Date
+}
+
+// ==========================================
+// Relationships
+// ==========================================
+
+users._id < refresh_tokens.userId
+users._id - carts.user
+users._id < orders.user
+users._id < payments.user
+users._id < payments.reconciledBy
+users._id < inventory_movements.actor
+
+categories._id < categories.parent
+categories._id < products.category
+brands._id < products.brand
+
+products._id < inventory_movements.product
+orders._id < inventory_movements.order
+orders._id < payments.order
